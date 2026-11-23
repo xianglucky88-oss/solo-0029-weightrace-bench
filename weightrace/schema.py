@@ -1,4 +1,19 @@
-VERSION = 1
+VERSION = 2
+
+ADOPTIONS = """
+CREATE TABLE IF NOT EXISTS adoptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
+    metric TEXT NOT NULL CHECK (metric IN ('indication', 'hysteresis', 'repeatability', 'eccentricity', 'drift')),
+    release INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    registered_at TEXT NOT NULL,
+    superseded_at TEXT,
+    supersede_reason TEXT,
+    FOREIGN KEY (session, release) REFERENCES releases(session, number)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS adoptions_active ON adoptions(session, metric) WHERE superseded_at IS NULL;
+"""
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -37,4 +52,6 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     session TEXT NOT NULL, number INTEGER NOT NULL, reason TEXT NOT NULL, withdrawn_at TEXT NOT NULL,
     PRIMARY KEY (session, number), FOREIGN KEY (session, number) REFERENCES releases(session, number)
 );
-"""
+""" + ADOPTIONS
+
+MIGRATIONS = {1: ADOPTIONS}

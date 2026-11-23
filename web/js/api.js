@@ -16,6 +16,7 @@ export async function request(path, value, { raw = false } = {}) {
   if (!response.ok) {
     const error = new Error(data.message || '请求失败');
     error.code = data.error;
+    error.details = data.details;
     throw error;
   }
   return data;

@@ -1,7 +1,7 @@
 import { fileUrl, request, sessionPath } from './api.js';
 import { $, button, el, labelled, table } from './dom.js';
 import { closeEditor, editorForm, openEditor } from './editor.js';
-import { badge, metricLabels, mg, mono } from './labels.js';
+import { badge, metricLabels, mg, mono, stateLabels } from './labels.js';
 
 function showWithdrawal(record, path, onSaved) {
   openEditor(`撤回 v${record.number}`, editorForm([
@@ -12,6 +12,61 @@ function showWithdrawal(record, path, onSaved) {
     closeEditor();
     await onSaved('交付件已撤回，原始内容保留。');
   }));
+}
+
+function showAdoption(id, item, records, onSaved) {
+  const usable = records.filter((record) => !record.reason);
+  const title = `${item.status === 'pending' ? '重新接替' : item.release ? '更正接替' : '登记接替'} · ${metricLabels[item.metric]}`;
+  if (!usable.length) {
+    openEditor(title, el('p', {}, '当前没有可采用的未撤回交付件。'));
+    return;
+  }
+  let expect = item.release ?? null;
+  const conflict = el('p', { class: 'dialog-error', role: 'alert' });
+  openEditor(title, editorForm([
+    el('p', {}, '接替只引用所选交付件中该分项已封存的结论及其读数、基准与限值，不跨版拼算。'),
+    labelled('采用交付件', el('select', { name: 'release' }, usable.map((record) =>
+      el('option', { value: record.number, selected: record.number === item.release },
+        `v${record.number} · ${stateLabels[record.outcome]}`)))),
+    labelled('接替事由', el('textarea', { name: 'reason', required: true, maxlength: 180, rows: 3 })),
+    conflict,
+  ], '确认接替', async (form) => {
+    try {
+      await request(sessionPath(id, '/adoptions'), {
+        metric: item.metric, release: Number(form.get('release')),
+        reason: form.get('reason'), expect_release: expect,
+      });
+    } catch (failure) {
+      if (failure.code !== 'adoption_conflict') throw failure;
+      const current = failure.details?.current;
+      conflict.textContent = current
+        ? `该分项现任接替为 v${current.release}（${current.registered_at} 登记：${current.reason}）。核对后如需更正，请再次提交。`
+        : '该分项的现任接替与预期不符。核对后如需登记，请再次提交。';
+      expect = current?.release ?? null;
+      return;
+    }
+    closeEditor();
+    await onSaved('接替已登记。');
+  }));
+}
+
+function renderAdoptions(id, records, adoptions, onSaved) {
+  $('adoptions').replaceChildren(table(['分项', '采用来源', '分项结论', '状态', '登记事由 / UTC', '操作'],
+    adoptions.current.map((item) => [
+      metricLabels[item.metric],
+      item.release ? `v${item.release}${item.status === 'pending' ? ' · 已撤回' : ''}` : '—',
+      item.outcome ? badge(item.outcome) : '—',
+      badge(item.status),
+      item.release ? el('div', {}, el('p', {}, item.reason), el('small', {}, mono(item.registered_at))) : '—',
+      button(item.status === 'pending' ? '重新接替' : item.release ? '更正接替' : '登记接替',
+        () => showAdoption(id, item, records, onSaved)),
+    ])));
+  $('adoption-history').replaceChildren(table(['分项', '原采用', '登记事由 / UTC', '停用 UTC', '停用事由'],
+    [...adoptions.history].reverse().map((row) => [
+      metricLabels[row.metric], `v${row.release}`,
+      el('div', {}, el('p', {}, row.reason), el('small', {}, mono(row.registered_at))),
+      mono(row.superseded_at), row.supersede_reason,
+    ]), '暂无接替变更'));
 }
 
 function diffView(diff) {
@@ -25,7 +80,7 @@ function diffView(diff) {
       diff.metrics.map((x) => [metricLabels[x.id], badge(x.before.outcome), badge(x.after.outcome)]), '无分项差异')));
 }
 
-export function renderReleases(id, records, onSaved, run) {
+export function renderReleases(id, records, adoptions, onSaved, run) {
   $('releases').replaceChildren(table(['版本 / 代次', '签出 UTC', '结论', '状态', '操作'], records.map((record) => {
     const path = sessionPath(id, `/releases/${record.number}`);
     return [`v${record.number} / ${record.generation}`, mono(record.published_at), badge(record.outcome),
@@ -51,4 +106,5 @@ export function renderReleases(id, records, onSaved, run) {
     } }, labelled('基准版', select('left', records[1].number)), labelled('比较版', select('right', records[0].number)),
     el('button', { type: 'submit' }, '逐步对账')), target,
   ]));
+  renderAdoptions(id, records, adoptions, onSaved);
 }

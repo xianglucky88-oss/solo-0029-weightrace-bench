@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 
-from .schema import SCHEMA, VERSION
+from .schema import MIGRATIONS, SCHEMA, VERSION
 
 
 class Database:
@@ -12,10 +12,12 @@ class Database:
         connection = self.connect()
         try:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, VERSION):
-                raise ValueError(f"无法打开数据库结构版本 {version}")
             if version == 0:
                 connection.executescript(f"BEGIN IMMEDIATE;\n{SCHEMA}\nPRAGMA user_version = {VERSION};\nCOMMIT;")
+            elif version in MIGRATIONS:
+                connection.executescript(f"BEGIN IMMEDIATE;\n{MIGRATIONS[version]}\nPRAGMA user_version = {VERSION};\nCOMMIT;")
+            elif version != VERSION:
+                raise ValueError(f"无法打开数据库结构版本 {version}")
             connection.execute("PRAGMA journal_mode = WAL")
         finally:
             connection.close()

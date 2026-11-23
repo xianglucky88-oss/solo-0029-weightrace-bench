@@ -1,3 +1,4 @@
+from .adoptions import adoption_view
 from .archives import list_releases
 from .evaluation import evaluate, working_input
 from .intake import list_packets
@@ -11,4 +12,4 @@ def read_workbench(db, key):
         state = "withdrawn"
     return {"plan": snapshot["plan"], "generation": snapshot["generation"], "state": state,
             "result": evaluate(snapshot), "decisions": snapshot["decisions"],
-            "packets": list_packets(db, key), "releases": releases}
+            "packets": list_packets(db, key), "releases": releases, "adoptions": adoption_view(db, key)}

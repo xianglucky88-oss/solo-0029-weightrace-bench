@@ -49,7 +49,7 @@ async function refresh(key, tab) {
   $('workspace').hidden = !current;
   $('empty').hidden = Boolean(current);
   if (!current) return;
-  const { plan, generation, state, result, releases } = current;
+  const { plan, generation, state, result, releases, adoptions } = current;
   const saved = async (message) => {
     try { await refresh(id); notice(message); }
     catch { notice(`${message} 刷新失败，请重新选择测次。`, true); }
@@ -62,7 +62,7 @@ async function refresh(key, tab) {
   renderSteps(result, (step) => showEvidence(id, generation, step, saved));
   renderMetrics(result);
   renderRecords(current);
-  renderReleases(id, releases, saved, run);
+  renderReleases(id, releases, adoptions, saved, run);
   if (tab) selectTab(tab);
 }
 

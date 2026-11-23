@@ -2,6 +2,7 @@ import re
 from urllib.parse import parse_qs, urlsplit
 
 from .adjudication import record_decision
+from .adoptions import register_adoption
 from .archives import freeze_release, get_release, withdraw_release
 from .compare import compare_releases
 from .demo import load_demo
@@ -50,12 +51,15 @@ def route_api(db, method, target, item):
                 return 200, read_workbench(db, key)
             if action == "compare":
                 return 200, compare_releases(db, key, *compare_args(url.query))
-        elif action in ("packets", "decisions", "releases"):
+        elif action in ("packets", "decisions", "releases", "adoptions"):
             if action == "packets":
                 result = accept_packet(db, key, item)
                 return (200 if result["duplicate"] else 201), result
             if action == "decisions":
                 return 201, record_decision(db, key, item)
+            if action == "adoptions":
+                result, created = register_adoption(db, key, item)
+                return (201 if created else 200), result
             result, created = freeze_release(db, key, item)
             return (201 if created else 200), result
         release = RELEASE.fullmatch(action or "")

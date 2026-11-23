@@ -42,5 +42,6 @@ main{min-width:0;padding:20px 22px 34px}
 .issues ul{padding-left:20px;margin:4px 0}
 .plain-pane h2:not(.section-head h2){margin:16px 0 7px}
 .plain-pane td{overflow-wrap:anywhere}
+.adopt-note{margin:0 0 8px;max-width:76ch}
 @media(max-width:1120px){.layout{grid-template-columns:180px minmax(0,1fr)}.workspace-grid{grid-template-columns:minmax(0,1fr)}.verdicts{border-left:0;padding-left:0}}
 @media(max-width:680px){.layout{display:block}.rail{border-right:0;border-bottom:1px solid var(--line);padding:8px 12px}.rail-head{margin-bottom:4px}.session-list{grid-auto-columns:minmax(140px,max-content);grid-auto-flow:column;overflow:auto;margin-bottom:7px}.topbar{padding:0 12px}.topbar small{display:none}main{padding:13px 12px 24px}.work-header{align-items:flex-start}.work-header h1{font-size:23px}.actions button{min-height:38px}}
