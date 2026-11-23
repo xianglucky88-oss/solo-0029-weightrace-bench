@@ -22,7 +22,7 @@ small,.muted{color:var(--muted)}
 .badge{display:inline-flex;align-items:center;gap:5px;background:#e9efeb;padding:3px 7px;border-radius:4px;white-space:nowrap;font-size:12px;font-weight:650}
 .badge.pass,.badge.matched,.badge.released{background:#e1f1e7;color:#145540}
 .badge.fail,.badge.withdrawn,.badge.out_of_order{background:#fae6e3;color:var(--red)}
-.badge.borderline,.badge.ambiguous,.badge.amended{background:#fff0d3;color:var(--amber)}
+.badge.borderline,.badge.ambiguous,.badge.amended,.badge.review{background:#fff0d3;color:var(--amber)}
 .table-wrap{overflow:auto}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{padding:9px 10px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--line)}

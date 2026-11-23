@@ -9,6 +9,7 @@ from .errors import Problem
 from .export import export_release
 from .intake import accept_packet
 from .replay import replay
+from .reviews import submit_opinion
 from .sessions import create_session, list_sessions
 from .standards import list_standards, register_standard
 from .values import fields
@@ -50,12 +51,14 @@ def route_api(db, method, target, item):
                 return 200, read_workbench(db, key)
             if action == "compare":
                 return 200, compare_releases(db, key, *compare_args(url.query))
-        elif action in ("packets", "decisions", "releases"):
+        elif action in ("packets", "decisions", "reviews", "releases"):
             if action == "packets":
                 result = accept_packet(db, key, item)
                 return (200 if result["duplicate"] else 201), result
             if action == "decisions":
                 return 201, record_decision(db, key, item)
+            if action == "reviews":
+                return 201, submit_opinion(db, key, item)
             result, created = freeze_release(db, key, item)
             return (201 if created else 200), result
         release = RELEASE.fullmatch(action or "")

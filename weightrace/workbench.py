@@ -10,5 +10,5 @@ def read_workbench(db, key):
     if state == "released" and releases[0]["reason"]:
         state = "withdrawn"
     return {"plan": snapshot["plan"], "generation": snapshot["generation"], "state": state,
-            "result": evaluate(snapshot), "decisions": snapshot["decisions"],
+            "result": evaluate(snapshot), "decisions": snapshot["decisions"], "reviews": snapshot["reviews"],
             "packets": list_packets(db, key), "releases": releases}

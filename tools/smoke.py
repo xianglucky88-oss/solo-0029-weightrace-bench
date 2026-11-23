@@ -94,6 +94,9 @@ def exercise(port, stop):
     releases = f"{session}/releases"
     r1 = api(releases, {"generation": 2}, status=201)
     assert api(releases, {"generation": 2}) == r1
+    early = {"reviewer": "赵甲", "candidates": ["LINDEN-08"], "keep": "LINDEN-08", "drops": [],
+             "reason": "候选不足两条", "generation": 2}
+    api(f"{session}/reviews", early, status=409, error="dual_review_not_required")
     late = Path(__file__).resolve().parents[1] / "examples" / "linden-late.json"
     api(packets, late.read_bytes(), status=201)
     api(releases, {"generation": 3}, status=409, error="release_blocked")
@@ -101,20 +104,78 @@ def exercise(port, stop):
         return
 
     decisions = f"{session}/decisions"
-    decision = {"reading": "LINDEN-08", "action": "exclude", "reason": "采用复测行", "generation": 2}
-    api(decisions, decision, status=409, error="stale_generation")
-    assert api(decisions, {**decision, "generation": 3}, status=201)["generation"] == 4
+    opinions = f"{session}/reviews"
+    decision = {"reading": "LINDEN-08", "action": "exclude", "reason": "采用复测行", "generation": 3}
+    api(decisions, decision, status=409, error="dual_review_required")
+    view = api(session)
+    review = view["result"]["review"]
+    assert view["result"]["outcome"] == "blocked" and review["required"]
+    assert review["status"] == "awaiting_first" and review["candidates"] == ["LINDEN-08", "LINDEN-08-SECOND"]
+    opinion = {"reviewer": "赵甲", "candidates": review["candidates"], "keep": "LINDEN-08-SECOND",
+               "drops": ["LINDEN-08"], "reason": "采用复测行", "generation": 3}
+    api(opinions, {**opinion, "generation": 2}, status=409, error="stale_generation")
+    api(opinions, {**opinion, "drops": []}, status=400, error="opinion_incomplete")
+    api(opinions, {**opinion, "candidates": ["LINDEN-08"]}, status=409, error="stale_candidates")
+    assert api(opinions, opinion, status=201)["generation"] == 4
+    assert api(session)["result"]["review"]["status"] == "awaiting_second"
+    api(releases, {"generation": 4}, status=409, error="release_blocked")
+    assert api(opinions, {**opinion, "reason": "重复确认", "generation": 4}, status=201)["generation"] == 5
+    assert api(session)["result"]["review"]["status"] == "awaiting_second"
+    clash = {"reviewer": "钱乙", "candidates": opinion["candidates"], "keep": "LINDEN-08",
+             "drops": ["LINDEN-08-SECOND"], "reason": "原始行更可信", "generation": 5}
+    assert api(opinions, clash, status=201)["generation"] == 6
+    assert api(session)["result"]["review"]["status"] == "conflict"
+    api(releases, {"generation": 6}, status=409, error="release_blocked")
+    aligned = {**clash, "keep": "LINDEN-08-SECOND", "drops": ["LINDEN-08"], "reason": "复测行与中心一致", "generation": 6}
+    assert api(opinions, aligned, status=201)["generation"] == 7
+    view = api(session)
+    review = view["result"]["review"]
+    assert review["status"] == "confirmed" and view["result"]["outcome"] == "fail"
+    assert [item["reviewer"] for item in review["opinions"]] == ["赵甲", "钱乙"]
+    assert len(review["stale"]) == 2 and {item["cause"] for item in review["stale"]} == {"superseded"}
+    assert {tuple(item["candidates"]) for item in review["stale"]} == {("LINDEN-08", "LINDEN-08-SECOND")}
+    duplicate = api(packets, late.read_bytes())
+    assert duplicate["duplicate"] and duplicate["generation"] == 7
+    assert api(session)["result"]["review"]["status"] == "confirmed"
+    other = {"id": "LINDEN-LOGGER-D", "rows": [
+        {"id": "LINDEN-09-SECOND", "step": "offset_right", "observed_at": "2026-09-18T09:01:25Z", "indicated_mg": 300016}]}
+    assert api(packets, other, status=201)["generation"] == 8
+    view = api(session)
+    assert view["result"]["review"]["status"] == "confirmed"
+    assert view["result"]["issues"] == [{"code": "ambiguous", "step": "offset_right", "readings": ["LINDEN-09", "LINDEN-09-SECOND"]}]
+    right = {"reading": "LINDEN-09-SECOND", "action": "exclude", "reason": "误发补包", "generation": 7}
+    api(decisions, right, status=409, error="stale_generation")
+    assert api(decisions, {**right, "generation": 8}, status=201)["generation"] == 9
     assert api(session)["result"]["outcome"] == "fail"
-    api(decisions, {**decision, "action": "include", "generation": 4}, status=201)
-    assert api(session)["result"]["outcome"] == "blocked"
-    api(decisions, {**decision, "generation": 5}, status=201)
+    third = {"id": "LINDEN-LOGGER-E", "rows": [
+        {"id": "LINDEN-08-THIRD", "step": "offset_left", "observed_at": "2026-09-18T09:01:08Z", "indicated_mg": 300021}]}
+    assert api(packets, third, status=201)["generation"] == 10
+    view = api(session)
+    review = view["result"]["review"]
+    assert review["status"] == "awaiting_first"
+    assert review["candidates"] == ["LINDEN-08", "LINDEN-08-SECOND", "LINDEN-08-THIRD"]
+    assert view["result"]["issues"] == [
+        {"code": "review", "step": "offset_left", "readings": review["candidates"]}]
+    assert len(review["stale"]) == 4 and {item["cause"] for item in review["stale"]} == {"candidates_changed"}
+    assert {tuple(item["candidates"]) for item in review["stale"]} == {("LINDEN-08", "LINDEN-08-SECOND")}
+    api(releases, {"generation": 10}, status=409, error="release_blocked")
+    again = {"candidates": review["candidates"], "keep": "LINDEN-08-SECOND", "drops": ["LINDEN-08", "LINDEN-08-THIRD"]}
+    assert api(opinions, {"reviewer": "赵甲", **again, "reason": "复测行仍最有效", "generation": 10}, status=201)["generation"] == 11
+    assert api(session)["result"]["review"]["status"] == "awaiting_second"
+    assert api(opinions, {"reviewer": "钱乙", **again, "reason": "同意复测行", "generation": 11}, status=201)["generation"] == 12
+    assert api(session)["result"]["outcome"] == "fail"
     if done("review"):
         return
 
-    r2 = api(releases, {"generation": 6}, status=201)
+    r2 = api(releases, {"generation": 12}, status=201)
     assert r2["body"]["number"] == 2
+    counted = r2["body"]["result"]["review"]["opinions"]
+    assert {item["reviewer"] for item in counted} == {"赵甲", "钱乙"}
+    assert all(item["keep"] == "LINDEN-08-SECOND" and
+               item["candidates"] == ["LINDEN-08", "LINDEN-08-SECOND", "LINDEN-08-THIRD"] for item in counted)
     diff = api(f"{session}/compare?left=1&right=2")
-    assert diff["outcomes"] == ["borderline", "fail"] and diff["packets_added"] == ["LINDEN-LOGGER-C"]
+    assert diff["outcomes"] == ["borderline", "fail"]
+    assert diff["packets_added"] == ["LINDEN-LOGGER-C", "LINDEN-LOGGER-D", "LINDEN-LOGGER-E"]
     assert [x["id"] for x in diff["steps"]] == ["offset_left"]
     api(f"{session}/compare?left=1&right=3", status=404, error="missing_release")
     if done("compare"):
@@ -138,7 +199,7 @@ def exercise(port, stop):
     withdrawal = api(action, reason)
     assert withdrawal == api(action, reason)
     api(action, {"reason": "更改事由"}, status=409, error="withdrawn")
-    assert api(session)["state"] == "withdrawn" and api(releases, {"generation": 6})["withdrawal"] == withdrawal
+    assert api(session)["state"] == "withdrawn" and api(releases, {"generation": 12})["withdrawal"] == withdrawal
     assert api(path, binary=True) == original_file and api(f"{releases}/2/replay")["verified"]
     done("withdraw")
 

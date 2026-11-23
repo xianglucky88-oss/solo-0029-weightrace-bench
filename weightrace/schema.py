@@ -1,4 +1,13 @@
-VERSION = 1
+VERSION = 2
+
+REVIEWS_TABLE = """
+CREATE TABLE IF NOT EXISTS reviews (
+    session TEXT NOT NULL, generation INTEGER NOT NULL, reviewer TEXT NOT NULL,
+    keep TEXT NOT NULL, drops TEXT NOT NULL, candidates TEXT NOT NULL,
+    reason TEXT NOT NULL, made_at TEXT NOT NULL, PRIMARY KEY (session, generation),
+    FOREIGN KEY (session, keep) REFERENCES readings(session, id)
+);
+"""
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -37,4 +46,6 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     session TEXT NOT NULL, number INTEGER NOT NULL, reason TEXT NOT NULL, withdrawn_at TEXT NOT NULL,
     PRIMARY KEY (session, number), FOREIGN KEY (session, number) REFERENCES releases(session, number)
 );
-"""
+""" + REVIEWS_TABLE
+
+MIGRATE_V1 = REVIEWS_TABLE
