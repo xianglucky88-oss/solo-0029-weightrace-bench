@@ -1,0 +1,28 @@
+{
+  "standards": [
+    {"id":"GRID-100", "revision":1, "nominal_mg":100, "correction_mg":0, "radius_mg":0, "valid_from":"2026-01-01", "valid_until":"2027-01-01"},
+    {"id":"GRID-200", "revision":1, "nominal_mg":200, "correction_mg":0, "radius_mg":0, "valid_from":"2026-01-01", "valid_until":"2027-01-01"}
+  ],
+  "session": {
+    "id":"HELL-001", "bench":"多档台 · 07", "measured_on":"2026-11-23",
+    "scales":[{"id":"G1", "grid_mg":1}, {"id":"G4", "grid_mg":4}],
+    "loads":{"low":[{"id":"GRID-100","revision":1}], "high":[{"id":"GRID-100","revision":1},{"id":"GRID-200","revision":1}]},
+    "limits_mg":{"indication":10,"hysteresis":2,"repeatability":6,"eccentricity":10,"drift":10}
+  },
+  "packets": [
+    {"id":"HELL-LOGGER-A", "rows":[
+      {"id":"R-01", "step":"zero_in",   "observed_at":"2026-11-23T09:00:00Z", "scale":"G1", "grids":0},
+      {"id":"R-02", "step":"rise_low",  "observed_at":"2026-11-23T09:00:01Z", "scale":"G1", "grids":104},
+      {"id":"R-03", "step":"rise_high", "observed_at":"2026-11-23T09:00:02Z", "scale":"G4", "grids":76},
+      {"id":"R-04", "step":"fall_low",  "observed_at":"2026-11-23T09:00:03Z", "scale":"G4", "grids":26},
+      {"id":"R-05", "step":"repeat_a",  "observed_at":"2026-11-23T09:00:04Z", "scale":"G4", "grids":76}
+    ]},
+    {"id":"HELL-LOGGER-B", "rows":[
+      {"id":"R-06", "step":"repeat_b",    "observed_at":"2026-11-23T09:00:05Z", "scale":"G4", "grids":76},
+      {"id":"R-07", "step":"repeat_c",    "observed_at":"2026-11-23T09:00:06Z", "scale":"G4", "grids":76},
+      {"id":"R-08", "step":"offset_left", "observed_at":"2026-11-23T09:00:07Z", "scale":"G4", "grids":76},
+      {"id":"R-09", "step":"offset_right","observed_at":"2026-11-23T09:00:08Z", "scale":"G4", "grids":76},
+      {"id":"R-10", "step":"zero_out",    "observed_at":"2026-11-23T09:00:10Z", "scale":"G4", "grids":0}
+    ]}
+  ]
+}

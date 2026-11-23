@@ -56,7 +56,10 @@ async function refresh(key, tab) {
   };
   $('work-id').textContent = plan.id;
   $('bench-name').textContent = plan.bench;
-  $('work-facts').replaceChildren(`${plan.measured_on} · 分度 ${plan.resolution_mg} mg · 代次 ${generation} `, badge(state));
+  const scaleText = plan.scales
+    ? `分度档 ${plan.scales.map((s) => `${s.id}=${s.grid_mg} mg/格`).join('，')}`
+    : `分度 ${plan.resolution_mg} mg`;
+  $('work-facts').replaceChildren(`${plan.measured_on} · ${scaleText} · 代次 ${generation} `, badge(state));
   $('publish').disabled = result.outcome === 'blocked' || releases[0]?.generation === generation;
   $('import-packet').onclick = () => showIntake(id, saved);
   renderSteps(result, (step) => showEvidence(id, generation, step, saved));

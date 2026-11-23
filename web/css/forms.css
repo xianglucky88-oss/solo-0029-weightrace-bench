@@ -17,4 +17,6 @@ legend{font-size:13px;font-weight:700}
 .dialog-error{color:var(--red);min-height:1.25em}
 .compare-form{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:14px 0 8px}
 .compare-form label{min-width:110px}
+.scale-rows{display:grid;gap:8px;margin:6px 0}
+.scale-rows .field-grid{align-items:end}
 @media(max-width:540px){.field-grid{grid-template-columns:minmax(0,1fr)}dialog{max-width:calc(100% - 16px)}}

@@ -1,5 +1,5 @@
 from .errors import Problem
-from .sessions import advance, get_session, require_generation
+from .sessions import advance, get_session, is_multiscale, require_generation
 from .values import fields, identifier, now, text
 
 
@@ -28,6 +28,18 @@ def list_decisions(db, key):
         FROM decisions WHERE session=? ORDER BY generation""", (key,))]
 
 
-def list_readings(db, key):
-    return [dict(row) for row in db.execute("""SELECT id, step, observed_at, indicated_mg, origin_packet
-        FROM readings WHERE session=? ORDER BY observed_at, id""", (key,))]
+def list_readings(db, key, plan=None):
+    rows = db.execute("""SELECT id, step, observed_at, indicated_mg, origin_packet, scale, grids
+        FROM readings WHERE session=? ORDER BY observed_at, id""", (key,))
+    multi = is_multiscale(plan) if plan else False
+    result = []
+    for row in rows:
+        item = dict(row)
+        if multi:
+            result.append(item)
+        else:
+            # 旧版单分度测次的封存结构保持不变，老交付件仍可逐字节复算。
+            item.pop("scale", None)
+            item.pop("grids", None)
+            result.append(item)
+    return result

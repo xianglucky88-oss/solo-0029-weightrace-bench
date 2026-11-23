@@ -4,15 +4,55 @@ from .protocol import LIMIT_KEYS, steps_for
 from .standards import resolve_load
 from .values import day, fields, identifier, integer, text
 
+MIN_SCALES = 1
+MAX_SCALES = 8
+MAX_GRID_MG = 100_000
+
+
+def is_multiscale(plan):
+    return "scales" in plan
+
+
+def grid_mg_for(plan):
+    if is_multiscale(plan):
+        return {scale["id"]: scale["grid_mg"] for scale in plan["scales"]}
+    return {"__single__": plan["resolution_mg"]}
+
+
+def parse_scales(item):
+    scales = item["scales"]
+    if not isinstance(scales, list) or not MIN_SCALES <= len(scales) <= MAX_SCALES:
+        raise Problem("scales", f"测次须锁定 {MIN_SCALES} 至 {MAX_SCALES} 个分度档")
+    locked, seen = [], set()
+    for scale in scales:
+        fields(scale, "id", "grid_mg")
+        key = identifier(scale["id"], "分度档编号")
+        if key in seen:
+            raise Problem("scale_duplicate", "分度档编号在同一测次重复", scale=key)
+        seen.add(key)
+        grid = integer(scale["grid_mg"], "每格毫克数", 1, MAX_GRID_MG)
+        locked.append({"id": key, "grid_mg": grid})
+    grids = {scale["grid_mg"] for scale in locked}
+    if len(grids) != len(locked):
+        raise Problem("scale_duplicate", "同一测次不能重复锁定相同的每格毫克数")
+    return locked
+
 
 def create_session(db, item):
-    fields(item, "id", "bench", "measured_on", "resolution_mg", "loads", "limits_mg")
+    if not isinstance(item, dict):
+        raise Problem("fields", "字段不完整或含未知字段")
+    multi = "scales" in item
+    if multi == ("resolution_mg" in item):
+        raise Problem("fields", "开测须二选一：旧版单分度 resolution_mg，或锁定分度档 scales")
+    required = ["id", "bench", "measured_on", "loads", "limits_mg", "scales" if multi else "resolution_mg"]
+    fields(item, *required)
     key = identifier(item["id"], "测次编号")
     if db.execute("SELECT 1 FROM sessions WHERE id=?", (key,)).fetchone():
         raise Problem("session_exists", "测次编号已存在", 409)
     bench = text(item["bench"], "工位名称", 64)
     measured_on = day(item["measured_on"])
-    resolution = integer(item["resolution_mg"], "分度值", 1, 100_000)
+    scales = parse_scales(item) if multi else None
+    resolution = None if multi else integer(item["resolution_mg"], "分度值", 1, MAX_GRID_MG)
     fields(item["loads"], "low", "high")
     fields(item["limits_mg"], *LIMIT_KEYS)
     limits = {key: integer(item["limits_mg"][key], key, 1, 1_000_000) for key in LIMIT_KEYS}
@@ -28,8 +68,12 @@ def create_session(db, item):
             if revision != standard["revision"]:
                 raise Problem("standard_split", "同一实物在同测次不能使用不同凭据修订", id=standard["id"])
     bands["zero"] = {"items": [], "reference_mg": 0, "radius_mg": 0}
-    plan = {"id": key, "bench": bench, "measured_on": measured_on, "resolution_mg": resolution,
+    plan = {"id": key, "bench": bench, "measured_on": measured_on,
             "loads": bands, "limits_mg": limits, "steps": steps_for(bands)}
+    if multi:
+        plan["scales"] = scales
+    else:
+        plan["resolution_mg"] = resolution
     db.execute("INSERT INTO sessions(id, plan) VALUES (?, ?)", (key, canonical(plan)))
     return plan
 

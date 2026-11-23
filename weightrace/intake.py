@@ -1,10 +1,11 @@
 from .codec import canonical, digest, loads
 from .errors import Problem
-from .sessions import advance, get_session
+from .sessions import advance, get_session, is_multiscale
 from .values import fields, identifier, instant, integer, now
 
 MAX_PACKETS = 100
 MAX_READINGS = 200
+GRID_LIMIT = 10**10
 
 
 def parse_packet(item, plan):
@@ -13,10 +14,16 @@ def parse_packet(item, plan):
     rows = item["rows"]
     if not isinstance(rows, list) or not 1 <= len(rows) <= 40:
         raise Problem("packet_size", "每包须有 1 至 40 条读数")
+    multi = is_multiscale(plan)
+    locked = {scale["id"]: scale["grid_mg"] for scale in plan["scales"]} if multi else None
     seen = set()
     steps = {step["id"] for step in plan["steps"]}
+    normalized = []
     for row in rows:
-        fields(row, "id", "step", "observed_at", "indicated_mg")
+        if multi:
+            fields(row, "id", "step", "observed_at", "scale", "grids")
+        else:
+            fields(row, "id", "step", "observed_at", "indicated_mg")
         row_id = identifier(row["id"], "读数编号")
         if row_id in seen:
             raise Problem("duplicate_row", "包内读数编号重复", reading=row_id)
@@ -25,15 +32,30 @@ def parse_packet(item, plan):
             raise Problem("step", "读数引用了不在计划内的步骤", reading=row_id)
         if instant(row["observed_at"]).date().isoformat() != plan["measured_on"]:
             raise Problem("observation_day", "读数须采自计划的 UTC 日期", reading=row_id)
-        value = integer(row["indicated_mg"], "原始示值", -10**10, 10**10)
-        if value % plan["resolution_mg"]:
-            raise Problem("resolution", "原始示值不在分度网格上", reading=row_id)
+        clean = {"id": row_id, "step": row["step"], "observed_at": row["observed_at"]}
+        if multi:
+            # 档位只能来自该读数自己声明的编号，禁止从加载档或换算值猜档。
+            scale = identifier(row["scale"], "分度档编号")
+            if scale not in locked:
+                # 未知档或缺档的包整包拒绝，不能部分归集。
+                raise Problem("unknown_scale", "读数声明的分度档未在开测时锁定", reading=row_id, scale=scale)
+            grids = integer(row["grids"], "原始格数", -GRID_LIMIT, GRID_LIMIT)
+            clean["scale"] = scale
+            clean["grids"] = grids
+            clean["indicated_mg"] = grids * locked[scale]
+        else:
+            value = integer(row["indicated_mg"], "原始示值", -GRID_LIMIT, GRID_LIMIT)
+            if value % plan["resolution_mg"]:
+                raise Problem("resolution", "原始示值不在分度网格上", reading=row_id)
+            clean["indicated_mg"] = value
+        normalized.append(clean)
     # Package row order is transport metadata, not acquisition order.
-    return {"id": item["id"], "rows": sorted(rows, key=lambda row: row["id"])}
+    return {"id": item["id"], "rows": sorted(normalized, key=lambda row: row["id"])}
 
 
 def accept_packet(db, key, item):
     plan, generation = get_session(db, key)
+    multi = is_multiscale(plan)
     packet = parse_packet(item, plan)
     checksum = digest(packet)
     previous = db.execute("SELECT digest FROM packets WHERE session=? AND id=?", (key, packet["id"])).fetchone()
@@ -46,15 +68,33 @@ def accept_packet(db, key, item):
     db.execute("INSERT INTO packets VALUES (?, ?, ?, ?, ?)", (key, packet["id"], canonical(packet), checksum, now()))
     inserted = 0
     for row in packet["rows"]:
-        values = (row["step"], row["observed_at"], row["indicated_mg"])
-        old = db.execute("SELECT step, observed_at, indicated_mg FROM readings WHERE session=? AND id=?",
-                         (key, row["id"])).fetchone()
-        if old:
-            if tuple(old) != values:
-                raise Problem("row_conflict", "已归集的读数编号不能改写", 409, reading=row["id"])
+        if multi:
+            values = (row["step"], row["observed_at"], row["indicated_mg"], row["scale"], row["grids"])
+            old = db.execute(
+                "SELECT step, observed_at, indicated_mg, scale, grids FROM readings WHERE session=? AND id=?",
+                (key, row["id"])).fetchone()
+            if old:
+                # 同号读数的原始格数或档位不同即拒绝改写，即使换算后的毫克示值相同。
+                if tuple(old) != values:
+                    raise Problem("row_conflict", "已归集的读数编号不能改写原始档位或格数", 409, reading=row["id"])
+            else:
+                db.execute(
+                    "INSERT INTO readings (session, id, step, observed_at, indicated_mg, origin_packet, scale, grids)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (key, row["id"], row["step"], row["observed_at"], row["indicated_mg"], packet["id"],
+                     row["scale"], row["grids"]))
+                inserted += 1
         else:
-            db.execute("INSERT INTO readings VALUES (?, ?, ?, ?, ?, ?)", (key, row["id"], *values, packet["id"]))
-            inserted += 1
+            values = (row["step"], row["observed_at"], row["indicated_mg"])
+            old = db.execute("SELECT step, observed_at, indicated_mg FROM readings WHERE session=? AND id=?",
+                             (key, row["id"])).fetchone()
+            if old:
+                if tuple(old) != values:
+                    raise Problem("row_conflict", "已归集的读数编号不能改写", 409, reading=row["id"])
+            else:
+                db.execute("INSERT INTO readings VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)",
+                           (key, row["id"], *values, packet["id"]))
+                inserted += 1
     if db.execute("SELECT COUNT(*) FROM readings WHERE session=?", (key,)).fetchone()[0] > MAX_READINGS:
         raise Problem("reading_capacity", "该测次超过读数上限，整包未归集", 409)
     # Even a second origin containing only duplicate readings is new evidence, not a retry.

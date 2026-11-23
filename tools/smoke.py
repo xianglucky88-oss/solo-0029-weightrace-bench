@@ -9,11 +9,14 @@ from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from weightrace.codec import digest as digest_json
 from weightrace.database import Database
 from weightrace.demo import demo_data
 from weightrace.httpd import WorkbenchServer
+from weightrace.replay import replay as replay_record
 
-WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw")
+WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw",
+             "multiscale", "lineage")
 
 
 def exercise(port, stop):
@@ -140,12 +143,84 @@ def exercise(port, stop):
     api(action, {"reason": "更改事由"}, status=409, error="withdrawn")
     assert api(session)["state"] == "withdrawn" and api(releases, {"generation": 6})["withdrawal"] == withdrawal
     assert api(path, binary=True) == original_file and api(f"{releases}/2/replay")["verified"]
-    done("withdraw")
+    if done("withdraw"):
+        return
+
+    hell = json.loads((Path(__file__).resolve().parents[1] / "examples" / "multiscale-hell.json").read_bytes())
+    for standard in hell["standards"]:
+        api("standards", standard, status=201)
+    hell_key = hell["session"]["id"]
+    hell_session = f"sessions/{hell_key}"
+    # 开测即锁定每档每格毫克数，单分度与多档字段互斥。
+    api("sessions", {**hell["session"], "resolution_mg": 1}, status=400, error="fields")
+    api("sessions", {k: v for k, v in hell["session"].items() if k != "scales"}, status=400, error="fields")
+    duplicated = {**hell["session"], "id": "HELL-DUP", "scales": [{"id": "A", "grid_mg": 1}, {"id": "B", "grid_mg": 1}]}
+    api("sessions", duplicated, status=400, error="scale_duplicate")
+    hell_plan = api("sessions", hell["session"], status=201)
+    assert [s["grid_mg"] for s in hell_plan["scales"]] == [1, 4] and "resolution_mg" not in hell_plan
+    hell_packets = f"{hell_session}/packets"
+    pa, pb = hell["packets"]
+    assert api(hell_packets, pa, status=201)["generation"] == 1
+    # 相同原始读数重发仍按旧规则幂等处理，不增代次。
+    assert api(hell_packets, pa)["duplicate"] and api(hell_packets, pa)["generation"] == 1
+    # 未知档、缺档、旧式行均整包拒绝，不能部分归集。
+    unknown = {"id": "BAD-SCALE", "rows": [{**pa["rows"][0], "id": "X-1", "scale": "G9"}]}
+    api(hell_packets, unknown, status=400, error="unknown_scale")
+    missing = {"id": "NO-SCALE", "rows": [{**{k: v for k, v in pa["rows"][0].items() if k != "scale"}, "id": "X-2"}]}
+    api(hell_packets, missing, status=400, error="fields")
+    legacy_row = {"id": "LEGACY-ROW", "rows": [{"id": "X-3", "step": "zero_in",
+                  "observed_at": "2026-11-23T09:00:00Z", "indicated_mg": 0}]}
+    api(hell_packets, legacy_row, status=400, error="fields")
+    # 同号读数从 4mg×26 格改成 1mg×104 格，即使都显示 104mg 也拒绝改写。
+    same_mg = {"id": "REWRITE-MG", "rows": [{"id": "R-04", "step": "fall_low",
+               "observed_at": "2026-11-23T09:00:03Z", "scale": "G1", "grids": 104}]}
+    api(hell_packets, same_mg, status=409, error="row_conflict")
+    # 被拒包不留痕：仍只有第一包，代次不变。
+    assert len(api(hell_session)["packets"]) == 1
+    assert api(hell_packets, pb, status=201)["generation"] == 2
+    hell_result = api(hell_session)["result"]
+    assert hell_result["engine"] == "weightrace-multigrid-v2"
+    assert all(step["state"] == "matched" for step in hell_result["steps"])
+    check = hell_result["metrics"]["hysteresis"]["checks"][0]
+    # 升低 1mg/格、回低 4mg/格：回程差区间 0 至 3mg，限值 2mg 判临界。
+    assert (check["lower"]["mg"], check["upper"]["mg"], check["outcome"]) == ("0/1", "3/1", "borderline")
+    assert hell_result["outcome"] == "borderline"
+    assert hell_result["metrics"]["drift"]["checks"][0]["upper"]["mg"] == "5/2"
+    if done("multiscale"):
+        return
+
+    hell_releases = f"{hell_session}/releases"
+    hell_release = api(hell_releases, {"generation": 2}, status=201)
+    assert api(f"{hell_releases}/1/replay")["verified"]
+    bundle = hell_release["body"]
+    adopted = {row["id"]: row for row in bundle["input"]["readings"]}
+    # 下载件必须追到所用读数的原始档位、格数与当次锁定分度。
+    assert adopted["R-04"]["scale"] == "G4" and adopted["R-04"]["grids"] == 26
+    assert {s["id"]: s["grid_mg"] for s in bundle["input"]["plan"]["scales"]} == {"G1": 1, "G4": 4}
+    tampered = deepcopy(bundle)
+    for packet in tampered["packets"]:
+        for row in packet["payload"]["rows"]:
+            if row["id"] == "R-04":
+                row["scale"], row["grids"] = "G1", 104
+        packet["digest"] = digest_json(packet["payload"])
+    for row in tampered["input"]["readings"]:
+        if row["id"] == "R-04":
+            row["scale"], row["grids"] = "G1", 104
+    tampered_record = {"body": tampered, "sha256": digest_json(tampered), "withdrawal": None}
+    # 毫克示值与摘要自洽也不够：采用档位与原包不符即复算不通过。
+    assert replay_record(tampered_record)["reason"] == "result_mismatch"
+    disagree = deepcopy(bundle)
+    for row in disagree["input"]["readings"]:
+        if row["id"] == "R-04":
+            row["scale"], row["grids"] = "G1", 104
+    disagree_record = {"body": disagree, "sha256": digest_json(disagree), "withdrawal": None}
+    assert replay_record(disagree_record)["reason"] == "provenance_mismatch"
+    done("lineage")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--through", choices=WORKFLOWS, default="withdraw")
+    parser.add_argument("--through", choices=WORKFLOWS, default="lineage")
     args = parser.parse_args()
     with TemporaryDirectory() as tmp, WorkbenchServer(Database(Path(tmp) / "smoke.sqlite3"), 0) as server:
         worker = Thread(target=server.serve_forever)

@@ -1,4 +1,4 @@
-VERSION = 1
+VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS packets (
 CREATE TABLE IF NOT EXISTS readings (
     session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
     id TEXT NOT NULL, step TEXT NOT NULL, observed_at TEXT NOT NULL, indicated_mg INTEGER NOT NULL,
-    origin_packet TEXT NOT NULL, PRIMARY KEY (session, id),
+    origin_packet TEXT NOT NULL, scale TEXT, grids INTEGER,
+    PRIMARY KEY (session, id),
     FOREIGN KEY (session, origin_packet) REFERENCES packets(session, id)
 );
 CREATE INDEX IF NOT EXISTS readings_step ON readings(session, step, observed_at);
@@ -38,3 +39,7 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     PRIMARY KEY (session, number), FOREIGN KEY (session, number) REFERENCES releases(session, number)
 );
 """
+
+MIGRATIONS = {
+    1: "ALTER TABLE readings ADD COLUMN scale TEXT;\nALTER TABLE readings ADD COLUMN grids INTEGER;",
+}
