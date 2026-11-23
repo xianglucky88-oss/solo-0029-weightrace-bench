@@ -3,6 +3,12 @@ from .codec import digest
 from .errors import Problem
 
 
+def _packet_label(packet):
+    # A rolled-over packet number recurs once per round, so the round is part of
+    # the identity shown to the reviewer.  Legacy packets keep their bare number.
+    return f"{packet['round']}/{packet['id']}" if packet.get("round") else packet["id"]
+
+
 def compare_releases(db, key, left_number, right_number):
     left, right = (get_release(db, key, number) for number in (left_number, right_number))
     if any(digest(record["body"]) != record["sha256"] for record in (left, right)):
@@ -18,7 +24,8 @@ def compare_releases(db, key, left_number, right_number):
             steps.append({"id": row["id"], "label": row["label"],
                           "before": {field: before[field] for field in ("selected", "error")},
                           "after": {field: row[field] for field in ("selected", "error")}})
-    old_packets, new_packets = ({packet["id"] for packet in record["body"]["packets"]} for record in (left, right))
+    old_packets = {_packet_label(packet) for packet in left["body"]["packets"]}
+    new_packets = {_packet_label(packet) for packet in right["body"]["packets"]}
     return {"left": left_number, "right": right_number, "outcomes": [old["outcome"], new["outcome"]],
             "steps": steps, "metrics": [{"id": name, "before": old["metrics"][name], "after": metric}
                 for name, metric in new["metrics"].items() if old["metrics"][name] != metric],

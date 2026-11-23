@@ -28,6 +28,21 @@ def text(value, label, maximum=180):
     return value.strip()
 
 
+def credential(value, label, maximum=64):
+    """Round credentials and delivery receipts arrive as opaque tokens.
+
+    Devices often number rounds or receipts with integers, so both integers and
+    short printable strings are accepted and normalised to their text form.
+    """
+    if type(value) is int and 1 <= value <= 10**9:
+        return str(value)
+    if isinstance(value, str):
+        trimmed = value.strip()
+        if 1 <= len(trimmed) <= maximum and not any(ord(char) < 32 or ord(char) == 127 for char in trimmed):
+            return trimmed
+    raise Problem("credential", f"{label}须为 1 至 {maximum} 字的凭据")
+
+
 def day(value):
     try:
         parsed = date.fromisoformat(value)

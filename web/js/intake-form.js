@@ -26,7 +26,13 @@ export function showIntake(id, onSaved) {
     '归集', async (form) => {
       const result = await request(sessionPath(id, '/packets'), form.get('packet'), { raw: true });
       closeEditor();
-      await onSaved(result.duplicate ? '相同采集包已存在，代次未变。' : '采集包已归集。');
+      if (result.pending) {
+        await onSaved(result.duplicate ? '相同回执与内容已在待认领区，未重复挂起。' : '包内未带轮次凭据，已留在待认领区。');
+      } else if (result.retransmission) {
+        await onSaved('同轮同号同内容，按重传处理，代次未变。');
+      } else {
+        await onSaved('采集包已归集。');
+      }
     }));
 }
 
@@ -34,7 +40,11 @@ export function showEvidence(id, generation, step, onSaved) {
   const rows = step.candidates.map((row) => {
     const active = row.decision?.action !== 'exclude';
     const action = active ? 'exclude' : 'include';
-    return [mono(row.id), mono(row.origin_packet), mono(row.observed_at), mono(row.indicated_mg),
+    const sources = (row.sources ?? []).map((source) => {
+      const round = source.round || '普通收包';
+      return `${round} · ${source.packet}${source.receipt ? ` · 回执 ${source.receipt}` : ''}`;
+    }).join('；') || row.origin_packet;
+    return [mono(row.id), mono(sources), mono(row.observed_at), mono(row.indicated_mg),
       active ? '有效' : '已剔除', button(actionLabels[action], () => {
         openEditor(`${actionLabels[action]} ${row.id}`, editorForm(labelled('复核说明', el('textarea', {
           name: 'reason', required: true, maxlength: 180, rows: 3,
@@ -45,5 +55,5 @@ export function showEvidence(id, generation, step, onSaved) {
         }));
       })];
   });
-  openEditor(step.label, el('div', { class: 'table-wrap' }, table(['读数', '首次采集包', 'UTC', '示值 mg', '状态', '复核'], rows)));
+  openEditor(step.label, el('div', { class: 'table-wrap' }, table(['读数', '采集包与轮次来源', 'UTC', '示值 mg', '状态', '复核'], rows)));
 }

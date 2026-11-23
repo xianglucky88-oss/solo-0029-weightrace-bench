@@ -61,7 +61,7 @@ async function refresh(key, tab) {
   $('import-packet').onclick = () => showIntake(id, saved);
   renderSteps(result, (step) => showEvidence(id, generation, step, saved));
   renderMetrics(result);
-  renderRecords(current);
+  renderRecords(current, saved);
   renderReleases(id, releases, saved, run);
   if (tab) selectTab(tab);
 }

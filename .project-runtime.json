@@ -8,6 +8,7 @@
     {"workflow_id":"catalog","command":"python3 -B -m tools.smoke --through catalog"},
     {"workflow_id":"plan","command":"python3 -B -m tools.smoke --through plan"},
     {"workflow_id":"ingest","command":"python3 -B -m tools.smoke --through ingest"},
+    {"workflow_id":"rounds","command":"python3 -B -m tools.smoke --through rounds"},
     {"workflow_id":"evaluate","command":"python3 -B -m tools.smoke --through evaluate"},
     {"workflow_id":"freeze","command":"python3 -B -m tools.smoke --through freeze"},
     {"workflow_id":"review","command":"python3 -B -m tools.smoke --through review"},

@@ -1,8 +1,9 @@
 from collections import defaultdict
 
 
-def align_steps(plan, readings, decisions):
+def align_steps(plan, readings, decisions, origins=None):
     latest = {decision["reading"]: decision for decision in decisions}
+    sources = defaultdict(list, origins or {})
     by_step = defaultdict(list)
     for reading in readings:
         by_step[reading["step"]].append(reading)
@@ -10,7 +11,9 @@ def align_steps(plan, readings, decisions):
     previous = None
     for step in plan["steps"]:
         key = step["id"]
-        candidates = [{**row, "decision": latest.get(row["id"])} for row in by_step[key]]
+        candidates = [{**row, "decision": latest.get(row["id"]),
+                       **({"sources": sources.get(row["id"], [])} if origins is not None else {})}
+                      for row in by_step[key]]
         eligible = [row for row in candidates if not row["decision"] or row["decision"]["action"] == "include"]
         state = "matched"
         if len(eligible) != 1:

@@ -7,7 +7,8 @@ export function renderSteps(result, onEvidence) {
   $('coverage').textContent = `${coverage} / ${result.steps.length} 步已对齐`;
   const labels = Object.fromEntries(result.steps.map(({ id, label }) => [id, label]));
   $('issues').replaceChildren(...(result.issues.length ? [el('div', { class: 'issues' }, '当前无法判定',
-    el('ul', {}, result.issues.map(({ code, step }) => el('li', {}, `${labels[step]}：${stateLabels[code]}`))))] : []));
+    el('ul', {}, result.issues.map(({ code, step, pending }) => el('li', {},
+      step ? `${labels[step]}：${stateLabels[code]}` : pending ? `${stateLabels[code]}（${pending} 份），须先认领或结案` : stateLabels[code]))))] : []));
   const rows = result.steps.map((step) => {
     const selected = step.candidates.find(({ id }) => id === step.selected);
     return [step.label, badge(step.state), mono(selected?.observed_at.slice(11, 19) ?? '—'), mono(step.reference_mg),

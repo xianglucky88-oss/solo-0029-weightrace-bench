@@ -17,7 +17,7 @@ def freeze_release(db, key, item):
         return get_release(db, key, old[0]), False
     result = evaluate(snapshot)
     if result["outcome"] == "blocked":
-        raise Problem("release_blocked", "存在缺步、歧义或时间倒序，不能签出", 409, issues=result["issues"])
+        raise Problem("release_blocked", "存在缺步、歧义、时间倒序或待认领采集包，不能签出", 409, issues=result["issues"])
     number = db.execute("SELECT COALESCE(MAX(number), 0)+1 FROM releases WHERE session=?", (key,)).fetchone()[0]
     published_at = now()
     body = {"format": "weightrace-evidence-v1", "session": key, "number": number,

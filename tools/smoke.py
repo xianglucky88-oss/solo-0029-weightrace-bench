@@ -13,7 +13,7 @@ from weightrace.database import Database
 from weightrace.demo import demo_data
 from weightrace.httpd import WorkbenchServer
 
-WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw")
+WORKFLOWS = ("catalog", "plan", "ingest", "rounds", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw")
 
 
 def exercise(port, stop):
@@ -73,6 +73,51 @@ def exercise(port, stop):
     assert len(api(session)["packets"]) == 1
     assert api(packets, second, status=201)["generation"] == 2
     if done("ingest"):
+        return
+
+    round_session = deepcopy(d["session"])
+    round_session["id"] = "ROUND-CHECK"
+    api("sessions", round_session, status=201)
+    round_packets = "sessions/ROUND-CHECK/packets"
+    round_releases = "sessions/ROUND-CHECK/releases"
+    round_a, round_b = deepcopy(first), deepcopy(second)
+    round_a.update({"id": "LOGGER-01", "round": "R1"})
+    round_b.update({"id": "LOGGER-02", "round": "R1"})
+    assert api(round_packets, round_a, status=201)["generation"] == 1
+    retry = api(round_packets, {**round_a, "rows": round_a["rows"][::-1]})
+    assert retry["retransmission"] and retry["generation"] == 1
+    assert api(round_packets, round_b, status=201)["generation"] == 2
+    # A rolled-over number in the next round is a separate packet with its own source.
+    next_round = {**round_a, "round": "R2"}
+    rolled = api(round_packets, next_round, status=201)
+    assert rolled["generation"] == 3 and rolled["inserted"] == 0
+    api(round_packets, {**round_a, "rows": [{**round_a["rows"][0], "indicated_mg": 3},
+                                            *round_a["rows"][1:]]}, status=409, error="packet_conflict")
+    rewritten = {"id": "LOGGER-04", "round": "R1", "rows": [{**round_a["rows"][0], "indicated_mg": 7}]}
+    api(round_packets, rewritten, status=409, error="row_conflict")
+    held = {"id": "LOGGER-03", "receipt": "HANDOVER-7", "rows": deepcopy(round_a["rows"])}
+    assert api(round_packets, held, status=201)["status"] == "pending"
+    assert api(round_packets, held, status=200)["duplicate"]
+    changed = deepcopy(held)
+    changed["rows"][0]["indicated_mg"] += 1
+    api(round_packets, changed, status=409, error="receipt_conflict")
+    workbench = api("sessions/ROUND-CHECK")
+    assert workbench["pending_count"] == 1
+    assert any(issue["code"] == "pending_intake" for issue in workbench["result"]["issues"])
+    api(round_releases, {"generation": 3}, status=409, error="release_blocked")
+    claim = api("sessions/ROUND-CHECK/pending", {"receipt": "HANDOVER-7", "round": "R2", "disposition": "claim"})
+    assert claim["status"] == "claimed" and claim["round"] == "R2"
+    assert api("sessions/ROUND-CHECK")["pending_count"] == 0
+    listed = api("sessions/ROUND-CHECK")["packets"]
+    assert {(packet["round"], packet["id"], packet["round_basis"]) for packet in listed} == {
+        ("R1", "LOGGER-01", "credential"), ("R1", "LOGGER-02", "credential"),
+        ("R2", "LOGGER-01", "credential"), ("R2", "LOGGER-03", "claimed")}
+    released = api(round_releases, {"generation": 4}, status=201)
+    sources = [source for step in released["body"]["result"]["steps"] if step["id"] == "repeat_a"
+               for source in step["candidates"][0]["sources"]]
+    assert {(source["round"], source["packet"]) for source in sources} == {
+        ("R1", "LOGGER-01"), ("R2", "LOGGER-01"), ("R2", "LOGGER-03")}
+    if done("rounds"):
         return
 
     result = api(session)["result"]
