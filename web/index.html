@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>衡迹 · 称量测次复核台</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/bench.css">
+  <link rel="stylesheet" href="/css/forms.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">衡</span><span>衡迹 <small>称量测次复核台</small></span></a>
+    <button id="catalog-button" class="quiet">砝码凭据</button>
+  </header>
+  <div class="layout">
+    <aside class="rail" aria-label="测次列表">
+      <div class="rail-head"><h2>测次工作单</h2><button id="new-session" class="icon" title="开测次" aria-label="开测次">＋</button></div>
+      <nav id="sessions" class="session-list"></nav>
+      <button id="load-demo" class="quiet">载入椴木台样例</button>
+    </aside>
+    <main>
+      <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+      <div id="empty" class="empty"><h1>尚未选择测次</h1><p>可在左侧开测次或载入合成样例。</p></div>
+      <section id="workspace" hidden>
+        <header class="work-header">
+          <div><div class="overline" id="work-id"></div><h1 id="bench-name"></h1><div id="work-facts" class="work-facts"></div></div>
+          <div class="actions"><button id="import-packet">导入采集包</button><button id="publish" class="primary">签出交付件</button></div>
+        </header>
+        <nav class="tabs" aria-label="测次工作区">
+          <button id="working-tab" aria-pressed="true">测次复核</button>
+          <button id="packets-tab" aria-pressed="false">原始采集</button>
+          <button id="releases-tab" aria-pressed="false">交付历史</button>
+        </nav>
+        <section id="working-pane">
+          <div class="workspace-grid">
+            <section class="sequence" aria-labelledby="steps-heading">
+              <div class="section-head"><div><div class="overline">示值证据</div><h2 id="steps-heading">加载序列</h2></div><span id="coverage"></span></div>
+              <figure id="curve-figure" class="curve">
+                <figcaption>修正后示值误差 <span>mg</span></figcaption><canvas id="curve" role="img" aria-label="按实际采集时间绘制的各加载步骤误差"></canvas>
+              </figure>
+              <div id="issues"></div>
+              <div id="steps" class="table-wrap"></div>
+            </section>
+            <section class="verdicts" aria-labelledby="metrics-heading"><div class="section-head"><div><div class="overline">复核结论</div><h2 id="metrics-heading">分项判定</h2></div><span id="outcome"></span></div><div id="metrics"></div></section>
+          </div>
+        </section>
+        <section id="packets-pane" class="plain-pane" hidden><div class="section-head"><h2>归集记录</h2><span id="packet-count"></span></div><div id="packets" class="table-wrap"></div><h2>逐行复核记录</h2><div id="decisions" class="table-wrap"></div></section>
+        <section id="releases-pane" class="plain-pane" hidden><div class="section-head"><h2>交付件</h2></div><div id="releases" class="table-wrap"></div><div id="comparison"></div></section>
+      </section>
+    </main>
+  </div>
+  <dialog id="editor" aria-labelledby="dialog-title">
+    <div class="dialog-head"><h2 id="dialog-title"></h2><button class="icon" id="close-dialog" aria-label="关闭" title="关闭">×</button></div>
+    <div id="dialog-content"></div>
+  </dialog>
+</body>
+</html>

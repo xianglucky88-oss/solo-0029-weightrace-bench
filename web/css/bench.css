@@ -1,0 +1,46 @@
+.topbar{height:59px;border-bottom:1px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:12px}
+.brand{display:flex;gap:10px;align-items:center;font-size:19px;font-weight:750;text-decoration:none;color:var(--ink)}
+.brand-mark{display:grid;place-items:center;width:31px;height:31px;border-radius:5px;color:white;background:var(--green);font-size:15px}
+.brand small{font-weight:500;font-size:12px;margin-left:5px}
+.layout{max-width:1650px;margin:auto;display:grid;grid-template-columns:218px minmax(0,1fr);min-height:calc(100vh - 59px)}
+.rail{border-right:1px solid var(--line);background:#eff3ef;padding:20px 13px}
+.rail-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.rail-head h2{font-size:14px}
+.session-list{display:grid;gap:5px;margin-bottom:14px}
+.session-link{display:block;text-align:left;overflow-wrap:anywhere;border-color:transparent;background:none;min-width:0;width:100%}
+.session-link strong,.session-link small{display:block}
+.session-link[aria-current="true"]{background:#dbece1;border-color:#bed5c7;box-shadow:inset 3px 0 var(--green)}
+main{min-width:0;padding:20px 22px 34px}
+.empty{padding:30px 0}.empty p{margin-top:9px;color:var(--muted)}
+.work-header,.section-head,.work-facts,.actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.work-header,.section-head{justify-content:space-between}
+.work-header{padding-bottom:16px}
+.work-header h1{margin:4px 0 7px;overflow-wrap:anywhere}
+.work-facts{font-size:12px;color:var(--muted)}
+.overline{font-size:12px;color:var(--green);font-weight:700;overflow-wrap:anywhere}
+.tabs{display:flex;border-bottom:1px solid #becdc3;margin-bottom:17px;gap:4px;flex-wrap:wrap}
+.tabs button{border:0;border-radius:0;border-bottom:2px solid transparent;background:transparent;padding:8px 12px;font-weight:600}
+.tabs button[aria-pressed="true"]{border-bottom-color:var(--green);color:var(--green);background:#e8f1eb}
+.workspace-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(246px,307px);gap:21px;align-items:start}
+.section-head{min-height:43px;margin:0 0 10px}
+#coverage,#packet-count{color:var(--muted);font-size:12px}
+.curve{background:var(--white);border:1px solid var(--line);border-radius:5px;margin-bottom:12px;padding:8px 10px 0}
+.curve figcaption{color:#354a40;font-size:12px;font-weight:700}
+.curve figcaption span{font-family:var(--mono);color:var(--muted);font-weight:400}
+.curve canvas{display:block;width:100%;height:116px}
+.sequence table{min-width:580px}
+.verdicts{border-left:1px solid var(--line);padding-left:15px}
+.metric{border-top:1px solid var(--line);padding:10px 0}
+.metric summary{display:flex;align-items:center;justify-content:space-between;gap:5px;flex-wrap:wrap;cursor:pointer;font-weight:700}
+.metric summary::before{content:"›";color:var(--green);font-size:16px}
+.metric[open] summary::before{content:"⌄"}
+.metric summary .badge{margin-left:auto}
+.metric p{font-size:12px;color:var(--muted);margin-top:3px}
+.metric ul{margin:8px 0 0;padding-left:18px;font-size:12px;display:grid;gap:6px}
+.notice,.issues{margin-bottom:12px;padding:8px 11px;background:#e4f4eb;color:#174d3c;border-left:3px solid var(--green);overflow-wrap:anywhere}
+.notice.problem,.issues{background:#fff1db;color:#713f11;border-color:#a5671d}
+.issues ul{padding-left:20px;margin:4px 0}
+.plain-pane h2:not(.section-head h2){margin:16px 0 7px}
+.plain-pane td{overflow-wrap:anywhere}
+@media(max-width:1120px){.layout{grid-template-columns:180px minmax(0,1fr)}.workspace-grid{grid-template-columns:minmax(0,1fr)}.verdicts{border-left:0;padding-left:0}}
+@media(max-width:680px){.layout{display:block}.rail{border-right:0;border-bottom:1px solid var(--line);padding:8px 12px}.rail-head{margin-bottom:4px}.session-list{grid-auto-columns:minmax(140px,max-content);grid-auto-flow:column;overflow:auto;margin-bottom:7px}.topbar{padding:0 12px}.topbar small{display:none}main{padding:13px 12px 24px}.work-header{align-items:flex-start}.work-header h1{font-size:23px}.actions button{min-height:38px}}

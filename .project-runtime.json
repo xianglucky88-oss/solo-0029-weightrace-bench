@@ -1,0 +1,19 @@
+{
+  "language":"Python 3.11+ / JavaScript ES modules / HTML / CSS",
+  "project_shape":"fullstack",
+  "source_extensions":[".py",".js",".html",".css"],
+  "build_command":"python3 -B -c 'import pathlib, sqlite3, sys; assert sys.version_info >= (3, 11); assert sqlite3.sqlite_version_info >= (3, 35); assert sqlite3.connect(\":memory:\").execute(\"SELECT json_valid(char(123,125))\").fetchone() == (1,); [compile(p.read_bytes(), str(p), \"exec\") for folder in (\"weightrace\", \"tools\") for p in pathlib.Path(folder).glob(\"*.py\")]'",
+  "testing":"deferred",
+  "workflow_checks":[
+    {"workflow_id":"catalog","command":"python3 -B -m tools.smoke --through catalog"},
+    {"workflow_id":"plan","command":"python3 -B -m tools.smoke --through plan"},
+    {"workflow_id":"ingest","command":"python3 -B -m tools.smoke --through ingest"},
+    {"workflow_id":"evaluate","command":"python3 -B -m tools.smoke --through evaluate"},
+    {"workflow_id":"freeze","command":"python3 -B -m tools.smoke --through freeze"},
+    {"workflow_id":"review","command":"python3 -B -m tools.smoke --through review"},
+    {"workflow_id":"compare","command":"python3 -B -m tools.smoke --through compare"},
+    {"workflow_id":"replay","command":"python3 -B -m tools.smoke --through replay"},
+    {"workflow_id":"export","command":"python3 -B -m tools.smoke --through export"},
+    {"workflow_id":"withdraw","command":"python3 -B -m tools.smoke --through withdraw"}
+  ]
+}

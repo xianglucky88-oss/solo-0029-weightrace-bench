@@ -1,0 +1,32 @@
+:root{color-scheme:light;--ink:#202a28;--muted:#54625d;--paper:#f6f8f4;--white:#fff;--line:#dce3dc;--green:#12634f;--accent:#ddf2e8;--amber:#895414;--red:#a32d27;--mono:ui-monospace,SFMono-Regular,Consolas,monospace;font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--paper);font-size:14px}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+a{color:var(--green)}
+button,input,select,textarea{font:inherit;color:inherit}
+button,.button{display:inline-flex;justify-content:center;align-items:center;gap:6px;min-height:34px;background:var(--white);border:1px solid #c3cec5;border-radius:5px;padding:6px 12px;cursor:pointer;text-decoration:none;color:var(--ink);line-height:1.35}
+button:hover,.button:hover{background:#eaf3ee;border-color:#9eb7aa}
+button:disabled{opacity:.55;cursor:not-allowed}
+.primary{background:var(--green);border-color:var(--green);color:white;font-weight:650}
+.primary:hover:not(:disabled){background:#104e40;color:white}
+.quiet{background:transparent}
+.icon{width:34px;padding:0;font-size:20px}
+:focus-visible{outline:2px solid #32846e;outline-offset:2px}
+h1,h2,h3,p,figure{margin:0}
+h1{font-size:27px;line-height:1.25}
+h2{font-size:17px;line-height:1.4}
+h3{font-size:14px}
+small,.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{overflow-wrap:anywhere}
+.badge{display:inline-flex;align-items:center;gap:5px;background:#e9efeb;padding:3px 7px;border-radius:4px;white-space:nowrap;font-size:12px;font-weight:650}
+.badge.pass,.badge.matched,.badge.released{background:#e1f1e7;color:#145540}
+.badge.fail,.badge.withdrawn,.badge.out_of_order{background:#fae6e3;color:var(--red)}
+.badge.borderline,.badge.ambiguous,.badge.amended{background:#fff0d3;color:var(--amber)}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:9px 10px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--line)}
+th{background:#edf2ed;font-weight:650;color:#40554d;white-space:nowrap;font-size:12px}
+td{font-size:13px}
+td .quiet{font-size:12px;min-height:28px;padding:3px 8px;white-space:nowrap}
+.placeholder{color:var(--muted);padding:14px 0}

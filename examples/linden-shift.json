@@ -1,0 +1,27 @@
+{
+  "standards": [
+    {"id":"LINDEN-100", "revision":1, "nominal_mg":100000, "correction_mg":2, "radius_mg":1, "valid_from":"2026-01-01", "valid_until":"2027-01-01"},
+    {"id":"LINDEN-200", "revision":2, "nominal_mg":200000, "correction_mg":3, "radius_mg":2, "valid_from":"2026-07-01", "valid_until":"2027-07-01"}
+  ],
+  "session": {
+    "id":"LINDEN-0918", "bench":"椴木台 · 03", "measured_on":"2026-09-18", "resolution_mg":1,
+    "loads":{"low":[{"id":"LINDEN-100","revision":1}], "high":[{"id":"LINDEN-100","revision":1},{"id":"LINDEN-200","revision":2}]},
+    "limits_mg":{"indication":10,"hysteresis":5,"repeatability":5,"eccentricity":6,"drift":12}
+  },
+  "packets": [
+    {"id":"LINDEN-LOGGER-B", "rows":[
+      {"id":"LINDEN-05","step":"repeat_a","observed_at":"2026-09-18T09:00:28Z","indicated_mg":300013},
+      {"id":"LINDEN-06","step":"repeat_b","observed_at":"2026-09-18T09:00:40Z","indicated_mg":300013},
+      {"id":"LINDEN-07","step":"repeat_c","observed_at":"2026-09-18T09:00:55Z","indicated_mg":300014},
+      {"id":"LINDEN-08","step":"offset_left","observed_at":"2026-09-18T09:01:04Z","indicated_mg":300019},
+      {"id":"LINDEN-09","step":"offset_right","observed_at":"2026-09-18T09:01:20Z","indicated_mg":300014},
+      {"id":"LINDEN-10","step":"zero_out","observed_at":"2026-09-18T09:01:40Z","indicated_mg":12}
+    ]},
+    {"id":"LINDEN-LOGGER-A", "rows":[
+      {"id":"LINDEN-01","step":"zero_in","observed_at":"2026-09-18T09:00:00Z","indicated_mg":2},
+      {"id":"LINDEN-02","step":"rise_low","observed_at":"2026-09-18T09:00:05Z","indicated_mg":100007},
+      {"id":"LINDEN-03","step":"rise_high","observed_at":"2026-09-18T09:00:15Z","indicated_mg":300015},
+      {"id":"LINDEN-04","step":"fall_low","observed_at":"2026-09-18T09:00:20Z","indicated_mg":100007}
+    ]}
+  ]
+}
