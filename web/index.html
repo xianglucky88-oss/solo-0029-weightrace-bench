@@ -31,6 +31,7 @@
         <nav class="tabs" aria-label="测次工作区">
           <button id="working-tab" aria-pressed="true">测次复核</button>
           <button id="packets-tab" aria-pressed="false">原始采集</button>
+          <button id="handoffs-tab" aria-pressed="false">升程交接</button>
           <button id="releases-tab" aria-pressed="false">交付历史</button>
         </nav>
         <section id="working-pane">
@@ -47,6 +48,7 @@
           </div>
         </section>
         <section id="packets-pane" class="plain-pane" hidden><div class="section-head"><h2>归集记录</h2><span id="packet-count"></span></div><div id="packets" class="table-wrap"></div><h2>逐行复核记录</h2><div id="decisions" class="table-wrap"></div></section>
+        <section id="handoffs-pane" class="plain-pane" hidden><div id="handoffs"></div></section>
         <section id="releases-pane" class="plain-pane" hidden><div class="section-head"><h2>交付件</h2></div><div id="releases" class="table-wrap"></div><div id="comparison"></div></section>
       </section>
     </main>

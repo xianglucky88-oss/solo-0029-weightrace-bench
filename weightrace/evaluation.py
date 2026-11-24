@@ -3,9 +3,9 @@ from .alignment import align_steps
 from .metrics import metric_inputs
 from .sessions import get_session
 from .verdict import classify_metrics, exact, outcome
-from .zero_curve import zero_correct
+from .zero_curve import segment_corrections
 
-ENGINE = "weightrace-linear-v1"
+ENGINE = "weightrace-linear-segmented-v2"
 
 
 def working_input(db, key):
@@ -19,12 +19,16 @@ def evaluate(snapshot):
     steps, chosen, issues = align_steps(plan, snapshot["readings"], snapshot["decisions"])
     result = {"engine": ENGINE, "generation": snapshot["generation"], "steps": steps, "issues": issues}
     if issues:
-        return {**result, "outcome": "blocked", "metrics": {}}
-    corrected, drift = zero_correct(plan, chosen)
+        return {**result, "outcome": "blocked", "metrics": {}, "segments": []}
+    corrected, drifts = segment_corrections(plan, chosen)
     for step in steps:
         point = corrected[step["id"]]
         step["zero"] = exact(point["zero"])
         step["corrected"] = exact(point["indication"])
         step["error"] = exact(point["error"])
-    metrics = classify_metrics(metric_inputs(plan, corrected, drift), plan["limits_mg"])
-    return {**result, "metrics": metrics, "outcome": outcome([item["outcome"] for item in metrics.values()])}
+        step["segment"] = point["segment"]
+    metrics = classify_metrics(metric_inputs(plan, corrected, drifts), plan["limits_mg"])
+    segments = [{"id": segment_id, "drift": exact(info["drift"]), "anchors": info["anchors"],
+                 "span_seconds": info["span_seconds"]} for segment_id, info in sorted(drifts.items())]
+    return {**result, "metrics": metrics, "segments": segments,
+            "outcome": outcome([item["outcome"] for item in metrics.values()])}

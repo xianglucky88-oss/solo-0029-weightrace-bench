@@ -58,8 +58,13 @@ def accept_packet(db, key, item):
     if db.execute("SELECT COUNT(*) FROM readings WHERE session=?", (key,)).fetchone()[0] > MAX_READINGS:
         raise Problem("reading_capacity", "该测次超过读数上限，整包未归集", 409)
     # Even a second origin containing only duplicate readings is new evidence, not a retry.
+    generation = advance(db, key)
+    # A late candidate can make a standing hand-off ambiguous the moment it lands;
+    # record the lapse now so a later exclusion still requires re-confirmation.
+    from .handoff import reconcile
+    reconcile(db, key)
     return {"id": packet["id"], "digest": checksum, "inserted": inserted, "duplicate": False,
-            "generation": advance(db, key)}
+            "generation": generation}
 
 
 def list_packets(db, key, include_payload=False):

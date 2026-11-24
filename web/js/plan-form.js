@@ -24,6 +24,7 @@ export async function showPlan(onCreated) {
       input('bench', '工位', 'text', { maxlength: 64 }), input('measured_on', '测次日', 'date'),
       input('resolution_mg', '分度值 mg', 'number', { min: 1, max: 100000, value: 1 })),
     el('div', { class: 'field-grid' }, loadChoices('low', '低档凭据', standards), loadChoices('high', '高档凭据', standards)),
+    el('label', { class: 'check' }, el('input', { type: 'checkbox', name: 'mid_zero' }), '中途清零（升程后、回程前卸荷清零，分段修正）'),
     el('fieldset', {}, el('legend', {}, '分项上限 mg'), el('div', { class: 'field-grid' }, metrics.map(([id, label]) =>
       input(id, label, 'number', { min: 1, max: 1000000, value: 10 })))),
   ], '锁定计划', async (form) => {
@@ -33,6 +34,7 @@ export async function showPlan(onCreated) {
     });
     const value = { id: form.get('id'), bench: form.get('bench'), measured_on: form.get('measured_on'),
       resolution_mg: Number(form.get('resolution_mg')), loads: { low: refs('low'), high: refs('high') },
+      mid_zero: form.get('mid_zero') === 'on',
       limits_mg: Object.fromEntries(metrics.map(([id]) => [id, Number(form.get(id))])) };
     await request('sessions', value);
     closeEditor();

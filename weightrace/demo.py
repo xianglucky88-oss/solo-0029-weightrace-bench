@@ -5,14 +5,20 @@ from .intake import accept_packet
 from .sessions import create_session
 from .standards import register_standard
 
+EXAMPLES = ("linden-shift.json", "alder-split.json")
+
+
+def demo_datasets():
+    root = Path(__file__).resolve().parent.parent / "examples"
+    return [loads((root / name).read_bytes()) for name in EXAMPLES]
+
 
 def demo_data():
-    path = Path(__file__).resolve().parent.parent / "examples" / "linden-shift.json"
-    return loads(path.read_bytes())
+    # The primary sample drives the shipped smoke walkthrough.
+    return demo_datasets()[0]
 
 
-def load_demo(db):
-    data = demo_data()
+def _load(db, data):
     key = data["session"]["id"]
     if not db.execute("SELECT 1 FROM sessions WHERE id=?", (key,)).fetchone():
         for item in data["standards"]:
@@ -20,4 +26,9 @@ def load_demo(db):
         create_session(db, data["session"])
         for packet in data["packets"]:
             accept_packet(db, key, packet)
-    return {"id": key}
+    return key
+
+
+def load_demo(db):
+    keys = [_load(db, data) for data in demo_datasets()]
+    return {"id": keys[0], "sessions": keys}

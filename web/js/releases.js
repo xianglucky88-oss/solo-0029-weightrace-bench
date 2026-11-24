@@ -22,13 +22,17 @@ function diffView(diff) {
     el('div', { class: 'table-wrap' }, table(['加载步骤', '原读数 / 误差', '新读数 / 误差'],
       diff.steps.map((x) => [x.label, mono(stepValue(x.before)), mono(stepValue(x.after))]), '无步骤差异')),
     el('div', { class: 'table-wrap' }, table(['发生变化的分项', '原结论', '新结论'],
-      diff.metrics.map((x) => [metricLabels[x.id], badge(x.before.outcome), badge(x.after.outcome)]), '无分项差异')));
+      diff.metrics.map((x) => [metricLabels[x.id], badge(x.before.outcome), badge(x.after.outcome)]), '无分项差异')),
+    diff.handoffs.some(Boolean) ? el('p', {}, '升程交接：',
+      mono(diff.handoffs.map((held) => held ? `v${held.number} (${held.readings.rise_low}/${held.readings.rise_high})` : '—').join(' → ')),
+      diff.handoff_changed ? el('span', { class: 'badge withdrawn' }, '交接读数已变') : el('span', { class: 'badge released' }, '交接一致')) : null);
 }
 
 export function renderReleases(id, records, onSaved, run) {
-  $('releases').replaceChildren(table(['版本 / 代次', '签出 UTC', '结论', '状态', '操作'], records.map((record) => {
+  $('releases').replaceChildren(table(['版本 / 代次', '签出 UTC', '结论', '升程交接', '状态', '操作'], records.map((record) => {
     const path = sessionPath(id, `/releases/${record.number}`);
     return [`v${record.number} / ${record.generation}`, mono(record.published_at), badge(record.outcome),
+      record.handoff ? mono(`v${record.handoff.number} · ${record.handoff.reviewer}`) : '—',
       record.reason ? el('div', {}, badge('withdrawn'), el('p', {}, record.reason), el('small', {}, record.withdrawn_at)) : badge('released'),
       el('div', { class: 'actions' }, el('a', { class: 'button quiet', href: fileUrl(id, record.number) }, '下载'),
         button('复算', () => run(async () => {

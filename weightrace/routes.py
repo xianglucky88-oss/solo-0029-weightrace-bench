@@ -7,6 +7,7 @@ from .compare import compare_releases
 from .demo import load_demo
 from .errors import Problem
 from .export import export_release
+from .handoff import confirm_handoff, list_handoffs, record_invalidation, read_handoff
 from .intake import accept_packet
 from .replay import replay
 from .sessions import create_session, list_sessions
@@ -17,6 +18,7 @@ from .workbench import read_workbench
 PREFIX = "/weightrace/api/"
 DETAIL = re.compile(r"sessions/([A-Za-z0-9][A-Za-z0-9_-]{0,47})(?:/(.*))?")
 RELEASE = re.compile(r"releases/([1-9][0-9]{0,8})(?:/(replay|file|withdraw))?")
+HANDOFF = re.compile(r"handoffs/([1-9][0-9]{0,8})(?:/(invalidate))?")
 
 
 def compare_args(query):
@@ -50,14 +52,25 @@ def route_api(db, method, target, item):
                 return 200, read_workbench(db, key)
             if action == "compare":
                 return 200, compare_releases(db, key, *compare_args(url.query))
-        elif action in ("packets", "decisions", "releases"):
+            if action == "handoffs":
+                return 200, list_handoffs(db, key)
+        elif action in ("packets", "decisions", "releases", "handoffs"):
             if action == "packets":
                 result = accept_packet(db, key, item)
                 return (200 if result["duplicate"] else 201), result
             if action == "decisions":
                 return 201, record_decision(db, key, item)
+            if action == "handoffs":
+                return 201, confirm_handoff(db, key, item)
             result, created = freeze_release(db, key, item)
             return (201 if created else 200), result
+        handoff = HANDOFF.fullmatch(action or "")
+        if handoff:
+            number, operation = int(handoff[1]), handoff[2]
+            if method == "GET" and operation is None:
+                return 200, read_handoff(db, key, number)
+            if method == "POST" and operation == "invalidate":
+                return 201, record_invalidation(db, key, number, item)
         release = RELEASE.fullmatch(action or "")
         if release:
             number, operation = int(release[1]), release[2]

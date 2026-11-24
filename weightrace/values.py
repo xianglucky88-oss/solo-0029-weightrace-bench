@@ -4,9 +4,15 @@ import re
 from .errors import Problem
 
 
-def fields(value, *required):
-    if not isinstance(value, dict) or set(value) != set(required):
-        raise Problem("fields", "字段不完整或含未知字段", expected=list(required))
+def fields(value, *required, optional=()):
+    if not isinstance(value, dict) or not set(required) <= set(value) <= set(required) | set(optional):
+        raise Problem("fields", "字段不完整或含未知字段", expected=[*required, *(f"{name}?" for name in optional)])
+    return value
+
+
+def boolean(value, label):
+    if type(value) is not bool:
+        raise Problem("boolean", f"{label}须为布尔值")
     return value
 
 

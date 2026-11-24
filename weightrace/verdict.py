@@ -7,18 +7,18 @@ def exact(value):
 
 
 def classify_metrics(inputs, limits):
-    metrics = {}
-    for key, candidates in inputs.items():
-        limit = limits[key]
-        checks = []
-        for magnitude, radius, evidence in candidates:
-            lower = max(0, magnitude - radius)
-            upper = magnitude + radius
-            checks.append({"center": exact(magnitude), "lower": exact(lower), "upper": exact(upper),
-                           "steps": evidence, "outcome": "pass" if upper <= limit else
-                           "fail" if lower > limit else "borderline"})
-        metrics[key] = {"limit_mg": limit, "outcome": outcome([check["outcome"] for check in checks]), "checks": checks}
-    return metrics
+    return {key: classify_candidates(candidates, limits[key]) for key, candidates in inputs.items()}
+
+
+def classify_candidates(candidates, limit):
+    checks = []
+    for magnitude, radius, evidence in candidates:
+        lower = max(0, magnitude - radius)
+        upper = magnitude + radius
+        checks.append({"center": exact(magnitude), "lower": exact(lower), "upper": exact(upper),
+                       "steps": evidence, "outcome": "pass" if upper <= limit else
+                       "fail" if lower > limit else "borderline"})
+    return {"limit_mg": limit, "outcome": outcome([check["outcome"] for check in checks]), "checks": checks}
 
 
 def outcome(values):

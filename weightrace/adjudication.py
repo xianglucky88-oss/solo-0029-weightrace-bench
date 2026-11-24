@@ -20,6 +20,10 @@ def record_decision(db, key, item):
         raise Problem("unchanged_decision", "读数已在该状态；未追加决定", 409)
     generation = advance(db, key)
     db.execute("INSERT INTO decisions VALUES (?, ?, ?, ?, ?, ?)", (key, generation, reading, action, reason, now()))
+    # Adjudication can break a standing hand-off the instant it lands; record the
+    # lapse now so restoring the same reading later still demands a fresh confirm.
+    from .handoff import reconcile
+    reconcile(db, key)
     return {"generation": generation, "reading": reading, "action": action}
 
 

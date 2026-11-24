@@ -2,17 +2,19 @@ from .codec import canonical, loads
 from .errors import Problem
 from .protocol import LIMIT_KEYS, steps_for
 from .standards import resolve_load
-from .values import day, fields, identifier, integer, text
+from .values import boolean, day, fields, identifier, integer, text
 
 
 def create_session(db, item):
-    fields(item, "id", "bench", "measured_on", "resolution_mg", "loads", "limits_mg")
+    fields(item, "id", "bench", "measured_on", "resolution_mg", "loads", "limits_mg",
+           optional=("mid_zero",))
     key = identifier(item["id"], "测次编号")
     if db.execute("SELECT 1 FROM sessions WHERE id=?", (key,)).fetchone():
         raise Problem("session_exists", "测次编号已存在", 409)
     bench = text(item["bench"], "工位名称", 64)
     measured_on = day(item["measured_on"])
     resolution = integer(item["resolution_mg"], "分度值", 1, 100_000)
+    mid_zero = boolean(item.get("mid_zero", False), "中途清零")
     fields(item["loads"], "low", "high")
     fields(item["limits_mg"], *LIMIT_KEYS)
     limits = {key: integer(item["limits_mg"][key], key, 1, 1_000_000) for key in LIMIT_KEYS}
@@ -29,7 +31,8 @@ def create_session(db, item):
                 raise Problem("standard_split", "同一实物在同测次不能使用不同凭据修订", id=standard["id"])
     bands["zero"] = {"items": [], "reference_mg": 0, "radius_mg": 0}
     plan = {"id": key, "bench": bench, "measured_on": measured_on, "resolution_mg": resolution,
-            "loads": bands, "limits_mg": limits, "steps": steps_for(bands)}
+            "mid_zero": mid_zero,
+            "loads": bands, "limits_mg": limits, "steps": steps_for(bands, mid_zero)}
     db.execute("INSERT INTO sessions(id, plan) VALUES (?, ?)", (key, canonical(plan)))
     return plan
 

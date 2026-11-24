@@ -3,6 +3,7 @@ import { showCatalog } from './catalog.js';
 import { paintCurve } from './curve.js';
 import { $, el } from './dom.js';
 import { closeEditor } from './editor.js';
+import { renderHandoffs } from './handoffs.js';
 import { showEvidence, showIntake } from './intake-form.js';
 import { badge } from './labels.js';
 import { renderMetrics } from './metrics.js';
@@ -11,7 +12,7 @@ import { renderRecords } from './records.js';
 import { renderReleases } from './releases.js';
 import { renderSteps } from './steps.js';
 
-const tabs = ['working', 'packets', 'releases'];
+const tabs = ['working', 'packets', 'handoffs', 'releases'];
 let current = null;
 let busy = false;
 
@@ -62,6 +63,7 @@ async function refresh(key, tab) {
   renderSteps(result, (step) => showEvidence(id, generation, step, saved));
   renderMetrics(result);
   renderRecords(current);
+  renderHandoffs(id, generation, current, saved);
   renderReleases(id, releases, saved, run);
   if (tab) selectTab(tab);
 }

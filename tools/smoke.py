@@ -10,10 +10,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from weightrace.database import Database
-from weightrace.demo import demo_data
+from weightrace.demo import demo_data, demo_datasets
 from weightrace.httpd import WorkbenchServer
 
-WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw")
+WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay",
+             "export", "withdraw", "handoff")
 
 
 def exercise(port, stop):
@@ -140,12 +141,80 @@ def exercise(port, stop):
     api(action, {"reason": "更改事由"}, status=409, error="withdrawn")
     assert api(session)["state"] == "withdrawn" and api(releases, {"generation": 6})["withdrawal"] == withdrawal
     assert api(path, binary=True) == original_file and api(f"{releases}/2/replay")["verified"]
-    done("withdraw")
+    if done("withdraw"):
+        return
+
+    exercise_handoff(api, done, d)
+
+
+def exercise_handoff(api, done, d):
+    """Mid-shift reset: hand off the rise segment, invalidate, restore, re-confirm."""
+    split = next(data for data in demo_datasets() if data["session"]["id"] == "ALDER-0920")
+    key = split["session"]["id"]
+    session = f"sessions/{key}"
+    for standard in split["standards"]:
+        api("standards", standard, status=201)
+    api("sessions", split["session"], status=201)
+    rise, fall = split["packets"]
+    api(f"{session}/packets", rise, status=201)
+    workbench = api(session)
+    assert [step["id"] for step in workbench["plan"]["steps"]][:5] == [
+        "zero_in", "rise_low", "rise_high", "zero_mid_before", "zero_mid_after"]
+    assert workbench["result"]["outcome"] == "blocked" and workbench["handoffs"] == []
+
+    handoffs = f"{session}/handoffs"
+    claim = {"reviewer": "复核员乙", "zero_in": "ALDER-01", "rise_low": "ALDER-02",
+             "rise_high": "ALDER-03", "zero_mid_before": "ALDER-04", "generation": workbench["generation"]}
+    # The rise segment alone cannot satisfy a claim naming a reading that is not there.
+    api(handoffs, {**claim, "rise_low": "ALDER-03"}, status=409, error="handoff_mismatch")
+    handoff = api(handoffs, claim, status=201)
+    assert handoff["status"]["valid"] and handoff["document"]["readings"]["rise_high"] == "ALDER-03"
+    # The rise segment is corrected only against its own pans: the +607 reset jump
+    # never enters the zero for rise_high, so its error stays small, not ~600 mg.
+    rise_high = handoff["document"]["rise"]["rise_high"]
+    numerator, denominator = (int(part) for part in rise_high["error"]["mg"].split("/"))
+    assert abs(numerator / denominator) < 10, rise_high["error"]
+
+    # A full release is refused without the fall segment, regardless of the hand-off.
+    api(f"{session}/releases", {"generation": api(session)["generation"]}, status=409, error="release_blocked")
+    api(f"{session}/packets", fall, status=201)
+    workbench = api(session)
+    assert workbench["result"]["outcome"] != "blocked"
+    assert {segment["id"] for segment in workbench["result"]["segments"]} == {"rise", "fall"}
+    # Each segment's drift is judged on its own pans; the +607 reset jump is never drift.
+    drifts = {check["steps"][0]: check["upper"]["mg"] for check in workbench["result"]["metrics"]["drift"]["checks"]}
+    assert drifts["zero_mid_after"] == "7/1" and drifts["zero_in"] == "3/1", drifts
+
+    # A late candidate for the reset pan makes the hand-off ambiguous and blocks sign-off.
+    late = {"id": "ALDER-LATE", "rows": [
+        {"id": "ALDER-04-LATE", "step": "zero_mid_before",
+         "observed_at": "2026-09-20T08:10:27Z", "indicated_mg": 6}]}
+    api(f"{session}/packets", late, status=201)
+    workbench = api(session)
+    assert workbench["handoffs"][0]["status"]["reason"] == "step_ambiguous"
+    api(f"{session}/releases", {"generation": workbench["generation"]}, status=409)
+    # Excluding the late candidate restores the reading, but the hand-off stays lapsed.
+    api(f"{session}/decisions", {"reading": "ALDER-04-LATE", "action": "exclude",
+                                 "reason": "迟到候选", "generation": workbench["generation"]}, status=201)
+    workbench = api(session)
+    assert workbench["result"]["outcome"] != "blocked"
+    assert not workbench["handoffs"][0]["status"]["valid"]
+    assert workbench["invalidations"] and workbench["invalidations"][0]["reason"] == "step_ambiguous"
+    api(f"{session}/releases", {"generation": workbench["generation"]}, status=409, error="handoff_invalid")
+
+    # A fresh confirmation clears the way, and the release carries it and replays.
+    again = api(handoffs, {**claim, "generation": workbench["generation"]}, status=201)
+    assert again["number"] == 2
+    workbench = api(session)
+    release = api(f"{session}/releases", {"generation": workbench["generation"]}, status=201)
+    assert release["handoff"]["number"] == 2
+    assert api(f"{session}/releases/{release['body']['number']}/replay")["verified"]
+    done("handoff")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--through", choices=WORKFLOWS, default="withdraw")
+    parser.add_argument("--through", choices=WORKFLOWS, default="handoff")
     args = parser.parse_args()
     with TemporaryDirectory() as tmp, WorkbenchServer(Database(Path(tmp) / "smoke.sqlite3"), 0) as server:
         worker = Thread(target=server.serve_forever)

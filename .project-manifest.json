@@ -8,6 +8,7 @@
     {"id":"intake","paths":["weightrace/intake.py"],"responsibility":"采集包校验、判重与行来源"},
     {"id":"review","paths":["weightrace/adjudication.py"],"responsibility":"追加逐行裁决"},
     {"id":"align","paths":["weightrace/alignment.py"],"responsibility":"从生效证据重建时序"},
+    {"id":"handoff","paths":["weightrace/handoff.py"],"responsibility":"升程本段交接与失效登记"},
     {"id":"compute","paths":["weightrace/evaluation.py","weightrace/zero_curve.py","weightrace/metrics.py","weightrace/verdict.py"],"responsibility":"计算误差区间与判定"},
     {"id":"workbench","paths":["weightrace/workbench.py"],"responsibility":"组装工作视图"},
     {"id":"archives","paths":["weightrace/archives.py"],"responsibility":"签出快照和独立撤回记录"},
@@ -15,9 +16,9 @@
     {"id":"replay","paths":["weightrace/replay.py"],"responsibility":"封存输入复算"},
     {"id":"export","paths":["weightrace/export.py"],"responsibility":"交付文件导出"},
     {"id":"codec","paths":["weightrace/codec.py"],"responsibility":"规范化 JSON 与内容摘要"},
-    {"id":"web","paths":["web/index.html","web/js/app.js"],"responsibility":"浏览器工作台动作及视图组装"}
+    {"id":"web","paths":["web/index.html","web/js/app.js","web/js/handoffs.js"],"responsibility":"浏览器工作台动作及视图组装"}
   ],
-  "complexity":{"mechanisms":["凭据修订冻结","有效日期半开区间","标识冲突原子回滚","规范内容幂等","代次并发保护","采集时间严格排序","有理数零漂修正","共用零锚下差分区间","历史快照可复算","追加式撤回"]},
+  "complexity":{"mechanisms":["凭据修订冻结","有效日期半开区间","标识冲突原子回滚","规范内容幂等","代次并发保护","采集时间严格排序","有理数零漂修正","分段零锚独立修正","零漂分段取最不利","共用零锚下差分区间","跨段不共享误差来源","升程本段交接与失效追溯","历史快照可复算","追加式撤回"]},
   "workflows":[
     {"id":"catalog","name":"登记凭据","entry":"POST standards","steps":["验证区间","按修订插入"],"module_ids":["http","storage","catalog","codec"],"success":"登记及幂等回读","failure":"同修订不同内容拒绝","verification":"python3 -B -m tools.smoke --through catalog"},
     {"id":"plan","name":"锁定测次计划","entry":"POST sessions","steps":["按测次日解析凭据","保存加载步骤与参数"],"module_ids":["http","storage","catalog","plan"],"success":"新修订不改已锁定计划","failure":"过期凭据拒绝","verification":"python3 -B -m tools.smoke --through plan"},
@@ -28,6 +29,7 @@
     {"id":"compare","name":"版本对账","entry":"GET sessions/{id}/compare","steps":["读两份交付件","比较步骤及分项"],"module_ids":["http","archives","compare","codec"],"success":"报告左偏载证据变更","failure":"不存在的交付件拒绝","verification":"python3 -B -m tools.smoke --through compare"},
     {"id":"replay","name":"历史复算","entry":"GET sessions/{id}/releases/{number}/replay","steps":["验证封存摘要","计算并比对原结果"],"module_ids":["http","archives","replay","compute","codec"],"success":"旧版结果可独立复算","failure":"未知交付件拒绝","verification":"python3 -B -m tools.smoke --through replay"},
     {"id":"export","name":"下载交付件","entry":"GET sessions/{id}/releases/{number}/file","steps":["读取历史快照","核验并序列化"],"module_ids":["http","archives","export","codec"],"success":"下载内容与交付件相符","failure":"未归档版不可导出","verification":"python3 -B -m tools.smoke --through export"},
-    {"id":"withdraw","name":"撤回交付件","entry":"POST sessions/{id}/releases/{number}/withdraw","steps":["核查版号与前次撤回","保留原件并追加事由"],"module_ids":["http","archives","storage","workbench"],"success":"撤回后原文件字节不变","failure":"不能用不同事由覆盖原记录","verification":"python3 -B -m tools.smoke --through withdraw"}
+    {"id":"withdraw","name":"撤回交付件","entry":"POST sessions/{id}/releases/{number}/withdraw","steps":["核查版号与前次撤回","保留原件并追加事由"],"module_ids":["http","archives","storage","workbench"],"success":"撤回后原文件字节不变","failure":"不能用不同事由覆盖原记录","verification":"python3 -B -m tools.smoke --through withdraw"},
+    {"id":"handoff","name":"升程交接","entry":"GET/POST sessions/{id}/handoffs","steps":["按本段唯一有效读数核对","冻结读数与空盘依据","失效登记与重新确认"],"module_ids":["http","plan","handoff","align","compute","archives"],"success":"后段未归集也能交接本段","failure":"迟到多候选或裁决改变读数使交接失效","verification":"python3 -B -m tools.smoke --through handoff"}
   ]
 }

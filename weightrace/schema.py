@@ -1,4 +1,4 @@
-VERSION = 1
+VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -36,5 +36,51 @@ CREATE TABLE IF NOT EXISTS releases (
 CREATE TABLE IF NOT EXISTS withdrawals (
     session TEXT NOT NULL, number INTEGER NOT NULL, reason TEXT NOT NULL, withdrawn_at TEXT NOT NULL,
     PRIMARY KEY (session, number), FOREIGN KEY (session, number) REFERENCES releases(session, number)
+);
+CREATE TABLE IF NOT EXISTS handoffs (
+    session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
+    number INTEGER NOT NULL, generation INTEGER NOT NULL, plan_digest TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL, reviewer TEXT NOT NULL,
+    zero_in TEXT NOT NULL, rise_low TEXT NOT NULL, rise_high TEXT NOT NULL, zero_mid_before TEXT NOT NULL,
+    digest TEXT NOT NULL, document TEXT NOT NULL,
+    PRIMARY KEY (session, number),
+    FOREIGN KEY (session, zero_in) REFERENCES readings(session, id),
+    FOREIGN KEY (session, rise_low) REFERENCES readings(session, id),
+    FOREIGN KEY (session, rise_high) REFERENCES readings(session, id),
+    FOREIGN KEY (session, zero_mid_before) REFERENCES readings(session, id)
+);
+CREATE INDEX IF NOT EXISTS handoffs_generation ON handoffs(session, generation);
+-- Invalidation is an append-only history: the same hand-off can lapse more than
+-- once (e.g. after a re-confirm), and every event stays queryable.
+CREATE TABLE IF NOT EXISTS invalidations (
+    session TEXT NOT NULL, number INTEGER NOT NULL, event INTEGER NOT NULL, generation INTEGER NOT NULL,
+    reason TEXT NOT NULL, detail TEXT NOT NULL, invalidated_at TEXT NOT NULL,
+    PRIMARY KEY (session, number, event),
+    FOREIGN KEY (session, number) REFERENCES handoffs(session, number)
+);
+"""
+
+# v1 -> v2 introduced the segmented session flag and the hand-off registers.
+# Everything below is additive, so a v1 work database upgrades in place without
+# touching standards, sessions, packets, readings, decisions or releases.
+MIGRATION_2 = """
+CREATE TABLE IF NOT EXISTS handoffs (
+    session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
+    number INTEGER NOT NULL, generation INTEGER NOT NULL, plan_digest TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL, reviewer TEXT NOT NULL,
+    zero_in TEXT NOT NULL, rise_low TEXT NOT NULL, rise_high TEXT NOT NULL, zero_mid_before TEXT NOT NULL,
+    digest TEXT NOT NULL, document TEXT NOT NULL,
+    PRIMARY KEY (session, number),
+    FOREIGN KEY (session, zero_in) REFERENCES readings(session, id),
+    FOREIGN KEY (session, rise_low) REFERENCES readings(session, id),
+    FOREIGN KEY (session, rise_high) REFERENCES readings(session, id),
+    FOREIGN KEY (session, zero_mid_before) REFERENCES readings(session, id)
+);
+CREATE INDEX IF NOT EXISTS handoffs_generation ON handoffs(session, generation);
+CREATE TABLE IF NOT EXISTS invalidations (
+    session TEXT NOT NULL, number INTEGER NOT NULL, event INTEGER NOT NULL, generation INTEGER NOT NULL,
+    reason TEXT NOT NULL, detail TEXT NOT NULL, invalidated_at TEXT NOT NULL,
+    PRIMARY KEY (session, number, event),
+    FOREIGN KEY (session, number) REFERENCES handoffs(session, number)
 );
 """
