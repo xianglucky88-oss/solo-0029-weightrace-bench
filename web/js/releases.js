@@ -1,4 +1,4 @@
-import { fileUrl, request, sessionPath } from './api.js';
+import { copyUrl, fileUrl, request, sessionPath } from './api.js';
 import { $, button, el, labelled, table } from './dom.js';
 import { closeEditor, editorForm, openEditor } from './editor.js';
 import { badge, metricLabels, mg, mono } from './labels.js';
@@ -31,6 +31,8 @@ export function renderReleases(id, records, onSaved, run) {
     return [`v${record.number} / ${record.generation}`, mono(record.published_at), badge(record.outcome),
       record.reason ? el('div', {}, badge('withdrawn'), el('p', {}, record.reason), el('small', {}, record.withdrawn_at)) : badge('released'),
       el('div', { class: 'actions' }, el('a', { class: 'button quiet', href: fileUrl(id, record.number) }, '下载'),
+        el('a', { class: 'button quiet', href: copyUrl(id, record.number),
+          title: '去标识副本：隐去工位、原编号与事由，供外部复核方核验' }, '外发副本'),
         button('复算', () => run(async () => {
           const result = await request(`${path}/replay`);
           openEditor(`复算 v${record.number}`, el('p', {}, result.verified ? '封存输入与原判定一致，摘要已核对。' : `未能核验：${result.reason}`),

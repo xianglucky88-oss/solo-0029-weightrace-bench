@@ -7,6 +7,7 @@ from .compare import compare_releases
 from .demo import load_demo
 from .errors import Problem
 from .export import export_release
+from .handoff import export_copy
 from .intake import accept_packet
 from .replay import replay
 from .sessions import create_session, list_sessions
@@ -16,7 +17,7 @@ from .workbench import read_workbench
 
 PREFIX = "/weightrace/api/"
 DETAIL = re.compile(r"sessions/([A-Za-z0-9][A-Za-z0-9_-]{0,47})(?:/(.*))?")
-RELEASE = re.compile(r"releases/([1-9][0-9]{0,8})(?:/(replay|file|withdraw))?")
+RELEASE = re.compile(r"releases/([1-9][0-9]{0,8})(?:/(replay|file|withdraw|copy))?")
 
 
 def compare_args(query):
@@ -66,6 +67,8 @@ def route_api(db, method, target, item):
                     return 200, replay(get_release(db, key, number))
                 if operation == "file":
                     return 200, export_release(db, key, number)
+                if operation == "copy":
+                    return 200, export_copy(db, key, number)
                 if operation is None:
                     return 200, get_release(db, key, number)
             elif operation == "withdraw":

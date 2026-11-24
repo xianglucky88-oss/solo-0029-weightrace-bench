@@ -4,16 +4,22 @@ import argparse
 from copy import deepcopy
 import json
 from pathlib import Path
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
 from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from weightrace.codec import canonical, digest
 from weightrace.database import Database
 from weightrace.demo import demo_data
+from weightrace.handoff import deidentified_copy, verify_copy
 from weightrace.httpd import WorkbenchServer
+from weightrace.replay import replay
 
-WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw")
+WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export",
+             "withdraw", "handoff")
 
 
 def exercise(port, stop):
@@ -140,12 +146,93 @@ def exercise(port, stop):
     api(action, {"reason": "更改事由"}, status=409, error="withdrawn")
     assert api(session)["state"] == "withdrawn" and api(releases, {"generation": 6})["withdrawal"] == withdrawal
     assert api(path, binary=True) == original_file and api(f"{releases}/2/replay")["verified"]
-    done("withdraw")
+    if done("withdraw"):
+        return
+
+    # A second origin packet for an already-collected reading still counts as new evidence.
+    followup = {"id": "LINDEN-LOGGER-D", "rows": [dict(first["rows"][4])]}
+    assert api(packets, followup, status=201)["generation"] == 7
+    r3 = api(releases, {"generation": 7}, status=201)
+    assert r3["body"]["number"] == 3 and r3["body"]["result"]["outcome"] == "fail"
+
+    raw_copy = api(f"{releases}/3/copy", binary=True)
+    api(f"{releases}/4/copy", status=404, error="missing_release")
+    api(f"{releases}/3/copy", {}, status=404, error="not_found")
+    document = json.loads(raw_copy)
+    assert set(document) == {"body", "copy_sha256"}
+    body, stamp = document["body"], document["copy_sha256"]
+    assert body["format"] == "weightrace-review-copy-v1" and body["release"] == 3
+    assert digest(body) == stamp and stamp != r3["sha256"]
+    for leaked in ("LINDEN", "椴木台", "采用复测行", "外部复核撤回"):
+        assert leaked.encode("utf-8") not in raw_copy, leaked
+
+    readings = body["input"]["readings"]
+    reading_ids = [row["id"] for row in readings]
+    assert len(reading_ids) == 11 and len(set(reading_ids)) == 11
+    right = next(row for row in readings if row["step"] == "offset_right")
+    homes = [packet["id"] for packet in body["packets"]
+             if right["id"] in {row["id"] for row in packet["payload"]["rows"]}]
+    assert len(homes) == 2 and right["origin_packet"] in homes
+    bands = body["input"]["plan"]["loads"]
+    low_keys = {(item["id"], item["revision"]) for item in bands["low"]["items"]}
+    high_keys = {(item["id"], item["revision"]) for item in bands["high"]["items"]}
+    assert low_keys < high_keys and len(high_keys) == 2
+
+    decisions = body["input"]["decisions"]
+    assert [item["action"] for item in decisions] == ["exclude", "include", "exclude"]
+    assert all(set(item) == {"generation", "reading", "action", "made_at"} for item in decisions)
+    left = {step["id"]: step for step in body["result"]["steps"]}["offset_left"]
+    assert left["state"] == "matched" and left["selected"] in reading_ids and len(left["candidates"]) == 2
+    marked = {row["id"]: row["decision"] for row in left["candidates"]}
+    excluded = [key for key, decision in marked.items() if decision and decision["action"] == "exclude"]
+    assert excluded and left["selected"] not in excluded
+    assert all(decision is None or "reason" not in decision for decision in marked.values())
+    assert verify_copy(document)["verified"]
+
+    def tampered(update):
+        clone = deepcopy(body)
+        update(clone)
+        return {"body": clone, "copy_sha256": digest(clone)}
+
+    assert verify_copy(tampered(lambda b: b["input"]["readings"][0].update(origin_packet="P-0")))["reason"] == "broken_source"
+    assert verify_copy(tampered(lambda b: b["packets"][0]["payload"]["rows"][0].update(indicated_mg=3)))["reason"] == "broken_source"
+    assert verify_copy(tampered(lambda b: b["input"]["decisions"][0].update(reading="R-0")))["reason"] == "unknown_reading"
+    assert verify_copy(tampered(lambda b: b["result"].update(outcome="pass")))["reason"] == "result_mismatch"
+    assert verify_copy(tampered(lambda b: b["result"]["steps"][0].update(zero={"mg": "0/1", "display_mg": "0.000"})))["reason"] == "result_mismatch"
+    assert verify_copy({"body": body, "copy_sha256": "0" * 64})["reason"] == "digest_mismatch"
+    original_document = json.loads(api(f"{releases}/3/file", binary=True))
+    assert verify_copy(original_document)["reason"] == "not_review_copy"
+    assert not replay({"body": body, "sha256": stamp})["verified"]
+
+    record = api(f"{releases}/3")
+    record["body"]["notes"] = "内部备注：下周复测"
+    record["body"]["result"]["internal_memo"] = "仅限内部"
+    scrubbed = canonical(deidentified_copy(record))
+    assert "内部备注" not in scrubbed and "internal_memo" not in scrubbed and "notes" not in scrubbed
+
+    root = Path(__file__).resolve().parents[1]
+    with TemporaryDirectory() as stash:
+        good = Path(stash) / "copy.json"
+        good.write_bytes(raw_copy)
+        proc = subprocess.run([sys.executable, "-B", "-m", "weightrace.handoff", str(good)],
+                              cwd=root, capture_output=True, text=True)
+        assert proc.returncode == 0 and json.loads(proc.stdout)["verified"], proc.stderr
+        bad = Path(stash) / "flipped.json"
+        bad.write_text(json.dumps(tampered(lambda b: b["result"].update(outcome="pass"))))
+        proc = subprocess.run([sys.executable, "-B", "-m", "weightrace.handoff", str(bad)],
+                              cwd=root, capture_output=True, text=True)
+        assert proc.returncode == 1 and json.loads(proc.stdout)["reason"] == "result_mismatch"
+
+    assert api(f"{releases}/3/copy", binary=True) == raw_copy
+    assert api(f"{releases}/3")["sha256"] == r3["sha256"]
+    assert original_document == {"body": r3["body"], "sha256": r3["sha256"]}
+    assert api(f"{releases}/2")["withdrawal"] == withdrawal
+    done("handoff")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--through", choices=WORKFLOWS, default="withdraw")
+    parser.add_argument("--through", choices=WORKFLOWS, default="handoff")
     args = parser.parse_args()
     with TemporaryDirectory() as tmp, WorkbenchServer(Database(Path(tmp) / "smoke.sqlite3"), 0) as server:
         worker = Thread(target=server.serve_forever)
