@@ -1,4 +1,4 @@
-VERSION = 1
+VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS standards (
 );
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY, plan TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS bulletins (
+    id TEXT PRIMARY KEY, document TEXT NOT NULL, digest TEXT NOT NULL,
+    seq INTEGER NOT NULL, published_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS packets (
     session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
@@ -30,11 +34,30 @@ CREATE INDEX IF NOT EXISTS decisions_reading ON decisions(session, reading, gene
 CREATE TABLE IF NOT EXISTS releases (
     session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
     number INTEGER NOT NULL, generation INTEGER NOT NULL, published_at TEXT NOT NULL,
-    digest TEXT NOT NULL, bundle TEXT NOT NULL,
-    PRIMARY KEY (session, number), UNIQUE (session, generation)
+    digest TEXT NOT NULL, bundle TEXT NOT NULL, basis_id TEXT,
+    PRIMARY KEY (session, number), UNIQUE (session, generation, basis_id)
 );
 CREATE TABLE IF NOT EXISTS withdrawals (
     session TEXT NOT NULL, number INTEGER NOT NULL, reason TEXT NOT NULL, withdrawn_at TEXT NOT NULL,
     PRIMARY KEY (session, number), FOREIGN KEY (session, number) REFERENCES releases(session, number)
 );
+"""
+
+MIGRATE_1_2 = """
+PRAGMA foreign_keys=OFF;
+CREATE TABLE releases_v2 (
+    session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
+    number INTEGER NOT NULL, generation INTEGER NOT NULL, published_at TEXT NOT NULL,
+    digest TEXT NOT NULL, bundle TEXT NOT NULL, basis_id TEXT,
+    PRIMARY KEY (session, number), UNIQUE (session, generation, basis_id)
+);
+INSERT INTO releases_v2(session, number, generation, published_at, digest, bundle, basis_id)
+SELECT session, number, generation, published_at, digest, bundle, NULL FROM releases;
+DROP TABLE releases;
+ALTER TABLE releases_v2 RENAME TO releases;
+CREATE TABLE bulletins (
+    id TEXT PRIMARY KEY, document TEXT NOT NULL, digest TEXT NOT NULL,
+    seq INTEGER NOT NULL, published_at TEXT NOT NULL
+);
+PRAGMA foreign_keys=ON;
 """

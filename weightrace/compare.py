@@ -20,7 +20,16 @@ def compare_releases(db, key, left_number, right_number):
                           "after": {field: row[field] for field in ("selected", "error")}})
     old_packets, new_packets = ({packet["id"] for packet in record["body"]["packets"]} for record in (left, right))
     return {"left": left_number, "right": right_number, "outcomes": [old["outcome"], new["outcome"]],
+            "basis": [_basis_summary(left), _basis_summary(right)],
             "steps": steps, "metrics": [{"id": name, "before": old["metrics"][name], "after": metric}
                 for name, metric in new["metrics"].items() if old["metrics"][name] != metric],
             "packets_added": sorted(new_packets - old_packets), "packets_removed": sorted(old_packets - new_packets),
             "withdrawals": [left["withdrawal"], right["withdrawal"]]}
+
+
+def _basis_summary(record):
+    basis = record["body"]["result"].get("basis")
+    if basis is None or basis["mode"] == "own":
+        return {"mode": "own"}
+    bulletin = basis.get("bulletin")
+    return {"mode": "bulletin", "bulletin_id": bulletin["id"] if bulletin else None}

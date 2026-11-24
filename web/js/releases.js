@@ -16,8 +16,10 @@ function showWithdrawal(record, path, onSaved) {
 
 function diffView(diff) {
   const stepValue = (x) => `${x.selected ?? '—'} / ${mg(x.error)} mg`;
+  const basisText = (basis) => basis.mode === 'bulletin' ? `公告 ${basis.bulletin_id ?? '—'}` : '自带限值';
   return el('section', {}, el('h2', {}, `对账 · v${diff.left} → v${diff.right}`),
     el('p', {}, badge(diff.outcomes[0]), ' → ', badge(diff.outcomes[1])),
+    el('p', {}, `限值依据：${basisText(diff.basis[0])} → ${basisText(diff.basis[1])}`),
     el('p', {}, `新增采集包：${diff.packets_added.join('、') || '无'}；减少：${diff.packets_removed.join('、') || '无'}`),
     el('div', { class: 'table-wrap' }, table(['加载步骤', '原读数 / 误差', '新读数 / 误差'],
       diff.steps.map((x) => [x.label, mono(stepValue(x.before)), mono(stepValue(x.after))]), '无步骤差异')),
@@ -26,9 +28,10 @@ function diffView(diff) {
 }
 
 export function renderReleases(id, records, onSaved, run) {
-  $('releases').replaceChildren(table(['版本 / 代次', '签出 UTC', '结论', '状态', '操作'], records.map((record) => {
+  $('releases').replaceChildren(table(['版本 / 代次', '签出 UTC', '依据', '结论', '状态', '操作'], records.map((record) => {
     const path = sessionPath(id, `/releases/${record.number}`);
-    return [`v${record.number} / ${record.generation}`, mono(record.published_at), badge(record.outcome),
+    return [`v${record.number} / ${record.generation}`, mono(record.published_at),
+      mono(record.basis_id ? `公告 ${record.basis_id}` : '自带限值'), badge(record.outcome),
       record.reason ? el('div', {}, badge('withdrawn'), el('p', {}, record.reason), el('small', {}, record.withdrawn_at)) : badge('released'),
       el('div', { class: 'actions' }, el('a', { class: 'button quiet', href: fileUrl(id, record.number) }, '下载'),
         button('复算', () => run(async () => {

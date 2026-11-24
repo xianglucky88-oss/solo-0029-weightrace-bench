@@ -7,7 +7,9 @@ export function renderSteps(result, onEvidence) {
   $('coverage').textContent = `${coverage} / ${result.steps.length} 步已对齐`;
   const labels = Object.fromEntries(result.steps.map(({ id, label }) => [id, label]));
   $('issues').replaceChildren(...(result.issues.length ? [el('div', { class: 'issues' }, '当前无法判定',
-    el('ul', {}, result.issues.map(({ code, step }) => el('li', {}, `${labels[step]}：${stateLabels[code]}`))))] : []));
+    el('ul', {}, result.issues.map((issue) => el('li', {}, issue.code === 'missing_bulletin'
+      ? `${stateLabels.missing_bulletin}：测次日 ${issue.measured_on} 没有已发布且适用的限值公告`
+      : `${labels[issue.step]}：${stateLabels[issue.code]}`))))] : []));
   const rows = result.steps.map((step) => {
     const selected = step.candidates.find(({ id }) => id === step.selected);
     return [step.label, badge(step.state), mono(selected?.observed_at.slice(11, 19) ?? '—'), mono(step.reference_mg),

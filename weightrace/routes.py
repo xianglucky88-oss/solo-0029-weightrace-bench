@@ -3,6 +3,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from .adjudication import record_decision
 from .archives import freeze_release, get_release, withdraw_release
+from .bulletins import list_bulletins, register_bulletin
 from .compare import compare_releases
 from .demo import load_demo
 from .errors import Problem
@@ -39,6 +40,11 @@ def route_api(db, method, target, item):
         return (201 if created else 200), content
     if path == "sessions":
         return (200, list_sessions(db)) if method == "GET" else (201, create_session(db, item))
+    if path == "bulletins":
+        if method == "GET":
+            return 200, list_bulletins(db)
+        content, created = register_bulletin(db, item)
+        return (201 if created else 200), content
     if path == "demo" and method == "POST":
         fields(item)
         return 200, load_demo(db)

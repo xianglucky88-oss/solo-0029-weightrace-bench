@@ -1,4 +1,5 @@
 import { request, sessionPath } from './api.js';
+import { showBulletins } from './bulletins.js';
 import { showCatalog } from './catalog.js';
 import { paintCurve } from './curve.js';
 import { $, el } from './dom.js';
@@ -56,8 +57,15 @@ async function refresh(key, tab) {
   };
   $('work-id').textContent = plan.id;
   $('bench-name').textContent = plan.bench;
-  $('work-facts').replaceChildren(`${plan.measured_on} · 分度 ${plan.resolution_mg} mg · 代次 ${generation} `, badge(state));
-  $('publish').disabled = result.outcome === 'blocked' || releases[0]?.generation === generation;
+  const basis = result.basis;
+  const basisText = !basis ? '' : basis.mode === 'own' ? '自带限值'
+    : basis.bulletin ? `公告 ${basis.bulletin.id}（${basis.bulletin.effective_from} 起适用）`
+      : `缺适用公告（测次日 ${basis.measured_on}）`;
+  $('work-facts').replaceChildren(`${plan.measured_on} · 分度 ${plan.resolution_mg} mg · 代次 ${generation} `,
+    badge(state), basisText ? ` · 依据：${basisText}` : '');
+  const publishedHere = releases[0]?.generation === generation
+    && (!basis || basis.mode !== 'bulletin' || releases[0]?.basis_id === basis.bulletin?.id);
+  $('publish').disabled = result.outcome === 'blocked' || publishedHere;
   $('import-packet').onclick = () => showIntake(id, saved);
   renderSteps(result, (step) => showEvidence(id, generation, step, saved));
   renderMetrics(result);
@@ -68,14 +76,17 @@ async function refresh(key, tab) {
 
 $('close-dialog').addEventListener('click', closeEditor);
 $('catalog-button').addEventListener('click', () => run(showCatalog));
+$('bulletin-button').addEventListener('click', () => run(showBulletins));
 $('new-session').addEventListener('click', () => run(() => showPlan((id) => run(() => refresh(id, 'working')))));
 $('load-demo').addEventListener('click', () => run(async () => {
   const { id } = await request('demo', {});
   await refresh(id, 'working');
 }));
 $('publish').addEventListener('click', () => run(async () => {
-  const { plan: { id }, generation } = current;
-  const { body } = await request(sessionPath(id, '/releases'), { generation });
+  const { plan: { id }, generation, result } = current;
+  const payload = { generation };
+  if (result.basis?.mode === 'bulletin') payload.bulletin_id = result.basis.bulletin.id;
+  const { body } = await request(sessionPath(id, '/releases'), payload);
   await refresh(id, 'releases');
   notice(`已取得交付件 v${body.number}。`);
 }));

@@ -19,21 +19,36 @@ export async function showPlan(onCreated) {
     return;
   }
   const metrics = Object.entries(metricLabels);
+  const ownLimits = el('fieldset', { id: 'own-limits' }, el('legend', {}, '分项上限 mg'),
+    el('div', { class: 'field-grid' }, metrics.map(([id, label]) =>
+      input(id, label, 'number', { min: 1, max: 1000000, value: 10 })))));
+  const modeChoice = el('fieldset', {}, el('legend', {}, '判定方式'),
+    el('label', { class: 'check' }, el('input', { type: 'radio', name: 'judgement', value: 'own', required: true, checked: true }), '使用本单自带限值'),
+    el('label', { class: 'check' }, el('input', { type: 'radio', name: 'judgement', value: 'bulletin' }), '按公告判定（按测次日选最新适用公告）'));
+  modeChoice.addEventListener('change', () => {
+    const bulletin = modeChoice.querySelector('input[value="bulletin"]').checked;
+    ownLimits.hidden = bulletin;
+    ownLimits.querySelectorAll('input').forEach((node) => { node.disabled = bulletin; node.required = !bulletin; });
+  });
   openEditor('开测次', editorForm([
     el('div', { class: 'field-grid' }, input('id', '测次编号', 'text', { pattern: '[A-Za-z0-9][A-Za-z0-9_\\-]{0,47}' }),
       input('bench', '工位', 'text', { maxlength: 64 }), input('measured_on', '测次日', 'date'),
       input('resolution_mg', '分度值 mg', 'number', { min: 1, max: 100000, value: 1 })),
+    modeChoice,
     el('div', { class: 'field-grid' }, loadChoices('low', '低档凭据', standards), loadChoices('high', '高档凭据', standards)),
-    el('fieldset', {}, el('legend', {}, '分项上限 mg'), el('div', { class: 'field-grid' }, metrics.map(([id, label]) =>
-      input(id, label, 'number', { min: 1, max: 1000000, value: 10 })))),
+    ownLimits,
   ], '锁定计划', async (form) => {
+    const judgement = form.get('judgement');
     const refs = (name) => form.getAll(name).map((index) => {
       const { id, revision } = standards[Number(index)];
       return { id, revision };
     });
     const value = { id: form.get('id'), bench: form.get('bench'), measured_on: form.get('measured_on'),
-      resolution_mg: Number(form.get('resolution_mg')), loads: { low: refs('low'), high: refs('high') },
-      limits_mg: Object.fromEntries(metrics.map(([id]) => [id, Number(form.get(id))])) };
+      resolution_mg: Number(form.get('resolution_mg')), judgement,
+      loads: { low: refs('low'), high: refs('high') } };
+    if (judgement === 'own') {
+      value.limits_mg = Object.fromEntries(metrics.map(([id]) => [id, Number(form.get(id))]));
+    }
     await request('sessions', value);
     closeEditor();
     await onCreated(value.id);

@@ -5,6 +5,7 @@
   ],
   "session": {
     "id":"LINDEN-0918", "bench":"椴木台 · 03", "measured_on":"2026-09-18", "resolution_mg":1,
+    "judgement":"own",
     "loads":{"low":[{"id":"LINDEN-100","revision":1}], "high":[{"id":"LINDEN-100","revision":1},{"id":"LINDEN-200","revision":2}]},
     "limits_mg":{"indication":10,"hysteresis":5,"repeatability":5,"eccentricity":6,"drift":12}
   },
