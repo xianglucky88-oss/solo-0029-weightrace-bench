@@ -29,5 +29,5 @@ def list_decisions(db, key):
 
 
 def list_readings(db, key):
-    return [dict(row) for row in db.execute("""SELECT id, step, observed_at, indicated_mg, origin_packet
+    return [dict(row) for row in db.execute("""SELECT id, step, observed_at, indicated_mg, origin_packet, round
         FROM readings WHERE session=? ORDER BY observed_at, id""", (key,))]

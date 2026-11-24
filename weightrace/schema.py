@@ -1,4 +1,4 @@
-VERSION = 1
+VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -8,15 +8,20 @@ CREATE TABLE IF NOT EXISTS standards (
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY, plan TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS rounds (
+    session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
+    round INTEGER NOT NULL, high_load TEXT NOT NULL, origin TEXT NOT NULL, switched_at TEXT NOT NULL,
+    PRIMARY KEY (session, round)
+);
 CREATE TABLE IF NOT EXISTS packets (
     session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
     id TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, accepted_at TEXT NOT NULL,
-    PRIMARY KEY (session, id)
+    round INTEGER, PRIMARY KEY (session, id)
 );
 CREATE TABLE IF NOT EXISTS readings (
     session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
     id TEXT NOT NULL, step TEXT NOT NULL, observed_at TEXT NOT NULL, indicated_mg INTEGER NOT NULL,
-    origin_packet TEXT NOT NULL, PRIMARY KEY (session, id),
+    origin_packet TEXT NOT NULL, round INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (session, id),
     FOREIGN KEY (session, origin_packet) REFERENCES packets(session, id)
 );
 CREATE INDEX IF NOT EXISTS readings_step ON readings(session, step, observed_at);
@@ -36,5 +41,16 @@ CREATE TABLE IF NOT EXISTS releases (
 CREATE TABLE IF NOT EXISTS withdrawals (
     session TEXT NOT NULL, number INTEGER NOT NULL, reason TEXT NOT NULL, withdrawn_at TEXT NOT NULL,
     PRIMARY KEY (session, number), FOREIGN KEY (session, number) REFERENCES releases(session, number)
+);
+"""
+
+# Version 1 kept the same tables without round tracking.
+MIGRATE_1_TO_2 = """
+ALTER TABLE packets ADD COLUMN round INTEGER;
+ALTER TABLE readings ADD COLUMN round INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS rounds (
+    session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
+    round INTEGER NOT NULL, high_load TEXT NOT NULL, origin TEXT NOT NULL, switched_at TEXT NOT NULL,
+    PRIMARY KEY (session, round)
 );
 """

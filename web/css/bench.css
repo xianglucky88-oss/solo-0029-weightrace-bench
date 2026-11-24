@@ -37,6 +37,10 @@ main{min-width:0;padding:20px 22px 34px}
 .metric summary .badge{margin-left:auto}
 .metric p{font-size:12px;color:var(--muted);margin-top:3px}
 .metric ul{margin:8px 0 0;padding-left:18px;font-size:12px;display:grid;gap:6px}
+#rounds{margin-bottom:14px;border:1px solid var(--line);border-radius:5px;padding:9px 10px;background:var(--white)}
+#rounds h2{font-size:13px;margin-bottom:7px}
+#rounds table{font-size:12px}
+#switch-high{border-color:#a5671d;color:#713f11;background:#fff1db}
 .notice,.issues{margin-bottom:12px;padding:8px 11px;background:#e4f4eb;color:#174d3c;border-left:3px solid var(--green);overflow-wrap:anywhere}
 .notice.problem,.issues{background:#fff1db;color:#713f11;border-color:#a5671d}
 .issues ul{padding-left:20px;margin:4px 0}

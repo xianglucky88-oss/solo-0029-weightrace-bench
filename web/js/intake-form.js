@@ -3,7 +3,7 @@ import { button, el, labelled, table } from './dom.js';
 import { closeEditor, editorForm, openEditor } from './editor.js';
 import { actionLabels, mono } from './labels.js';
 
-export function showIntake(id, onSaved) {
+export function showIntake(id, onSaved, currentRound, incrementCheck) {
   const body = el('textarea', { name: 'packet', rows: 9, required: true, spellcheck: 'false', placeholder: '{"id":"PACKET-01","rows":[…]}' });
   const file = el('input', { type: 'file', accept: '.json,application/json' });
   const message = el('p', { class: 'dialog-error', role: 'alert' });
@@ -22,9 +22,17 @@ export function showIntake(id, onSaved) {
       message.textContent = '采集包无法读取为 UTF-8。';
     }
   });
-  openEditor('导入采集包', editorForm([labelled('从文件读取', file), message, labelled('采集包原文 JSON', body)],
+  const roundHint = incrementCheck
+    ? el('p', { class: 'dialog-error' },
+      `当前加载轮为第 ${currentRound} 轮：包内每条读数属于哪次加载必须明确，JSON 顶层须带 "round": ${currentRound}；归属旧轮或混入沿用读数将整包拒收。`)
+    : null;
+  openEditor('导入采集包', editorForm([labelled('从文件读取', file), message, roundHint, labelled('采集包原文 JSON', body)],
     '归集', async (form) => {
-      const result = await request(sessionPath(id, '/packets'), form.get('packet'), { raw: true });
+      const packet = JSON.parse(form.get('packet'));
+      if (incrementCheck && packet.round !== currentRound) {
+        throw new Error(`采集包须声明当前加载轮 round=${currentRound}。`);
+      }
+      const result = await request(sessionPath(id, '/packets'), packet);
       closeEditor();
       await onSaved(result.duplicate ? '相同采集包已存在，代次未变。' : '采集包已归集。');
     }));
@@ -34,7 +42,8 @@ export function showEvidence(id, generation, step, onSaved) {
   const rows = step.candidates.map((row) => {
     const active = row.decision?.action !== 'exclude';
     const action = active ? 'exclude' : 'include';
-    return [mono(row.id), mono(row.origin_packet), mono(row.observed_at), mono(row.indicated_mg),
+    return [mono(row.id), mono(row.origin_packet), mono(`第 ${row.round ?? 0} 轮`),
+      mono(row.observed_at), mono(row.indicated_mg),
       active ? '有效' : '已剔除', button(actionLabels[action], () => {
         openEditor(`${actionLabels[action]} ${row.id}`, editorForm(labelled('复核说明', el('textarea', {
           name: 'reason', required: true, maxlength: 180, rows: 3,
@@ -45,5 +54,6 @@ export function showEvidence(id, generation, step, onSaved) {
         }));
       })];
   });
-  openEditor(step.label, el('div', { class: 'table-wrap' }, table(['读数', '首次采集包', 'UTC', '示值 mg', '状态', '复核'], rows)));
+  openEditor(step.label, el('div', { class: 'table-wrap' },
+    table(['读数', '首次采集包', '加载轮', 'UTC', '示值 mg', '状态', '复核'], rows)));
 }

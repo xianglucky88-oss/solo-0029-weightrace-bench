@@ -20,7 +20,7 @@ def freeze_release(db, key, item):
         raise Problem("release_blocked", "存在缺步、歧义或时间倒序，不能签出", 409, issues=result["issues"])
     number = db.execute("SELECT COALESCE(MAX(number), 0)+1 FROM releases WHERE session=?", (key,)).fetchone()[0]
     published_at = now()
-    body = {"format": "weightrace-evidence-v1", "session": key, "number": number,
+    body = {"format": "weightrace-evidence-v2", "session": key, "number": number,
             "published_at": published_at, "input": snapshot, "packets": list_packets(db, key, True), "result": result}
     db.execute("INSERT INTO releases VALUES (?, ?, ?, ?, ?, ?)",
                (key, number, generation, published_at, digest(body), canonical(body)))

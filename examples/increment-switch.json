@@ -1,0 +1,55 @@
+{
+  "standards": [
+    {"id": "W-A", "revision": 1, "nominal_mg": 100, "correction_mg": 0, "radius_mg": 8,
+     "valid_from": "2026-01-01", "valid_until": "2027-01-01"},
+    {"id": "W-B", "revision": 1, "nominal_mg": 5, "correction_mg": 0, "radius_mg": 1,
+     "valid_from": "2026-01-01", "valid_until": "2027-01-01"},
+    {"id": "W-C", "revision": 1, "nominal_mg": 7, "correction_mg": 0, "radius_mg": 1,
+     "valid_from": "2026-01-01", "valid_until": "2027-01-01"},
+    {"id": "W-A2", "revision": 1, "nominal_mg": 100, "correction_mg": 0, "radius_mg": 8,
+     "valid_from": "2026-01-01", "valid_until": "2027-01-01"},
+    {"id": "W-OLD", "revision": 1, "nominal_mg": 7, "correction_mg": 0, "radius_mg": 1,
+     "valid_from": "2025-01-01", "valid_until": "2026-01-01"},
+    {"id": "W-BIG", "revision": 1, "nominal_mg": 200, "correction_mg": 0, "radius_mg": 2,
+     "valid_from": "2026-01-01", "valid_until": "2027-01-01"}
+  ],
+  "session": {
+    "id": "INCR-0001",
+    "bench": "椴木台 · 07",
+    "measured_on": "2026-11-24",
+    "resolution_mg": 1,
+    "increment_check": true,
+    "loads": {
+      "low": [{"id": "W-A", "revision": 1}],
+      "high": [{"id": "W-A", "revision": 1}, {"id": "W-B", "revision": 1}]
+    },
+    "limits_mg": {"indication": 10, "hysteresis": 5, "repeatability": 5,
+                  "eccentricity": 6, "drift": 12, "increment": 4}
+  },
+  "packets": [
+    {"id": "INCR-P0-HEAD", "round": 0, "rows": [
+      {"id": "R0-01", "step": "zero_in", "observed_at": "2026-11-24T09:00:00Z", "indicated_mg": 0},
+      {"id": "R0-02", "step": "rise_low", "observed_at": "2026-11-24T09:00:01Z", "indicated_mg": 100},
+      {"id": "R0-03", "step": "rise_high", "observed_at": "2026-11-24T09:00:02Z", "indicated_mg": 106},
+      {"id": "R0-04", "step": "fall_low", "observed_at": "2026-11-24T09:00:03Z", "indicated_mg": 100}
+    ]},
+    {"id": "INCR-P0-TAIL", "round": 0, "rows": [
+      {"id": "R0-05", "step": "repeat_a", "observed_at": "2026-11-24T09:00:04Z", "indicated_mg": 105},
+      {"id": "R0-06", "step": "repeat_b", "observed_at": "2026-11-24T09:00:05Z", "indicated_mg": 105},
+      {"id": "R0-07", "step": "repeat_c", "observed_at": "2026-11-24T09:00:06Z", "indicated_mg": 105},
+      {"id": "R0-08", "step": "offset_left", "observed_at": "2026-11-24T09:00:07Z", "indicated_mg": 105},
+      {"id": "R0-09", "step": "offset_right", "observed_at": "2026-11-24T09:00:08Z", "indicated_mg": 105},
+      {"id": "R0-10", "step": "zero_out", "observed_at": "2026-11-24T09:00:10Z", "indicated_mg": 0}
+    ]},
+    {"id": "INCR-P1-NEW", "round": 1, "rows": [
+      {"id": "R1-03", "step": "rise_high", "observed_at": "2026-11-24T09:00:03Z", "indicated_mg": 109},
+      {"id": "R1-04", "step": "fall_low", "observed_at": "2026-11-24T09:00:04Z", "indicated_mg": 100},
+      {"id": "R1-05", "step": "repeat_a", "observed_at": "2026-11-24T09:00:05Z", "indicated_mg": 107},
+      {"id": "R1-06", "step": "repeat_b", "observed_at": "2026-11-24T09:00:06Z", "indicated_mg": 107},
+      {"id": "R1-07", "step": "repeat_c", "observed_at": "2026-11-24T09:00:07Z", "indicated_mg": 107},
+      {"id": "R1-08", "step": "offset_left", "observed_at": "2026-11-24T09:00:08Z", "indicated_mg": 107},
+      {"id": "R1-09", "step": "offset_right", "observed_at": "2026-11-24T09:00:09Z", "indicated_mg": 107},
+      {"id": "R1-10", "step": "zero_out", "observed_at": "2026-11-24T09:00:10Z", "indicated_mg": 0}
+    ]}
+  ]
+}

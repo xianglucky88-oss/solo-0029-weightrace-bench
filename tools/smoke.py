@@ -9,11 +9,13 @@ from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from weightrace.codec import loads
 from weightrace.database import Database
 from weightrace.demo import demo_data
 from weightrace.httpd import WorkbenchServer
 
-WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export", "withdraw")
+WORKFLOWS = ("catalog", "plan", "ingest", "evaluate", "freeze", "review", "compare", "replay", "export",
+             "withdraw", "increment")
 
 
 def exercise(port, stop):
@@ -143,6 +145,91 @@ def exercise(port, stop):
     done("withdraw")
 
 
+def exercise_increment(port, stop):
+    base = f"http://127.0.0.1:{port}"
+    data = loads(Path(__file__).resolve().parents[1].joinpath("examples", "increment-switch.json").read_bytes())
+
+    def done(workflow):
+        print(f"PASS {workflow}")
+        return workflow == stop
+
+    def api(path, payload=None, *, status=200, error=None):
+        body = None if payload is None else json.dumps(payload).encode()
+        request = Request(f"{base}/weightrace/api/{path}", body, {"Content-Type": "application/json"})
+        try:
+            response = urlopen(request, timeout=4)
+        except HTTPError as exc:
+            response = exc
+        with response:
+            raw = response.read()
+        assert response.status == status, (path, response.status, raw[:400])
+        result = json.loads(raw)
+        if error:
+            assert result["error"] == error, result
+        return result
+
+    for standard in data["standards"]:
+        api("standards", standard, status=201)
+    sess = data["session"]
+    key = sess["id"]
+    sp = f"sessions/{key}"
+    plan = api("sessions", sess, status=201)
+    assert plan["increment_band"]["added_items"] == ["W-B"]
+    assert plan["increment_band"]["reference_mg"] == 5 and plan["increment_band"]["radius_mg"] == 1
+    p0_head, p0_tail, p1_new = data["packets"]
+    api(f"{sp}/packets", {"id": "NO-ROUND", "rows": p0_head["rows"][:1]}, status=400, error="packet_round_missing")
+    assert api(f"{sp}/packets", p0_head, status=201)["generation"] == 1
+    api(f"{sp}/packets", p0_tail, status=201)
+    result = api(sp)["result"]
+    inc = result["metrics"]["increment"]
+    assert inc["checks"][0]["upper"]["mg"] == "31/10" and inc["checks"][0]["lower"]["mg"] == "0/1"
+    assert inc["outcome"] == "pass"
+    # Failed switches never invalidate the accepted round-0 evidence.
+    api(f"{sp}/switches", {"generation": 99, "high": sess["loads"]["high"], "reason": "x"},
+        status=409, error="stale_generation")
+    api(f"{sp}/switches", {"generation": 2, "high": sess["loads"]["high"], "reason": "x"},
+        status=409, error="switch_unchanged")
+    api(f"{sp}/switches", {"generation": 2,
+        "high": [{"id": "W-A2", "revision": 1}, {"id": "W-B", "revision": 1}], "reason": "x"},
+        status=400, error="increment_carrier")
+    api(f"{sp}/switches", {"generation": 2,
+        "high": [{"id": "W-A", "revision": 1}, {"id": "W-OLD", "revision": 1}], "reason": "x"},
+        status=400, error="expired_standard")
+    assert api(sp)["current_round"] == 0
+    # A switch cannot precede the accepted round-0 carried evidence.
+    bare = {**sess, "id": "INCR-BARE"}
+    api("sessions", bare, status=201)
+    api("sessions/INCR-BARE/switches", {
+        "generation": 0, "high": [{"id": "W-A", "revision": 1}, {"id": "W-C", "revision": 1}], "reason": "x"},
+        status=409, error="switch_missing_carrier")
+    switched = api(f"{sp}/switches", {"generation": 2,
+        "high": [{"id": "W-A", "revision": 1}, {"id": "W-C", "revision": 1}], "reason": "附加砝码换 C"},
+        status=201)
+    assert switched["round"] == 1 and switched["increment_band"]["added_items"] == ["W-C"]
+    api(f"{sp}/packets", {**p1_new, "id": "STALE", "round": 0}, status=409, error="packet_round_stale")
+    api(f"{sp}/packets", {"id": "CARRIED", "round": 1, "rows": [
+        {"id": "X-1", "step": "zero_in", "observed_at": "2026-11-24T09:00:00Z", "indicated_mg": 0}]},
+        status=400, error="round_carried_step")
+    api(f"{sp}/packets", {"id": "CLASH", "round": 1, "rows": [
+        {"id": "R0-03", "step": "rise_high", "observed_at": "2026-11-24T09:00:03Z", "indicated_mg": 110}]},
+        status=409, error="row_conflict")
+    assert api(sp)["result"]["outcome"] == "blocked"
+    api(f"{sp}/packets", p1_new, status=201)
+    result = api(sp)["result"]
+    steps = {step["id"]: step for step in result["steps"]}
+    assert steps["zero_in"]["selected"] == "R0-01" and steps["rise_low"]["selected"] == "R0-02"
+    assert steps["rise_high"]["selected"] == "R1-03"
+    inc = result["metrics"]["increment"]
+    assert inc["checks"][0]["upper"]["mg"] == "21/5" and inc["outcome"] == "borderline"
+    assert result["outcome"] == "borderline"
+    release = api(f"{sp}/releases", {"generation": 4}, status=201)["body"]
+    assert release["format"] == "weightrace-evidence-v2"
+    assert api(f"{sp}/releases/1/replay")["verified"]
+    api(f"{sp}/switches", {"generation": 4, "high": sess["loads"]["high"], "reason": "x"},
+        status=409, error="switch_locked")
+    done("increment")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--through", choices=WORKFLOWS, default="withdraw")
@@ -151,7 +238,10 @@ def main():
         worker = Thread(target=server.serve_forever)
         worker.start()
         try:
-            exercise(server.server_port, args.through)
+            if args.through == "increment":
+                exercise_increment(server.server_port, args.through)
+            else:
+                exercise(server.server_port, args.through)
         finally:
             server.shutdown()
             worker.join()

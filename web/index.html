@@ -26,7 +26,7 @@
       <section id="workspace" hidden>
         <header class="work-header">
           <div><div class="overline" id="work-id"></div><h1 id="bench-name"></h1><div id="work-facts" class="work-facts"></div></div>
-          <div class="actions"><button id="import-packet">导入采集包</button><button id="publish" class="primary">签出交付件</button></div>
+          <div class="actions"><button id="import-packet">导入采集包</button><button id="switch-high" hidden>换用高档组合</button><button id="publish" class="primary">签出交付件</button></div>
         </header>
         <nav class="tabs" aria-label="测次工作区">
           <button id="working-tab" aria-pressed="true">测次复核</button>
@@ -43,7 +43,7 @@
               <div id="issues"></div>
               <div id="steps" class="table-wrap"></div>
             </section>
-            <section class="verdicts" aria-labelledby="metrics-heading"><div class="section-head"><div><div class="overline">复核结论</div><h2 id="metrics-heading">分项判定</h2></div><span id="outcome"></span></div><div id="metrics"></div></section>
+            <section class="verdicts" aria-labelledby="metrics-heading"><div class="section-head"><div><div class="overline">复核结论</div><h2 id="metrics-heading">分项判定</h2></div><span id="outcome"></span></div><div id="rounds"></div><div id="metrics"></div></section>
           </div>
         </section>
         <section id="packets-pane" class="plain-pane" hidden><div class="section-head"><h2>归集记录</h2><span id="packet-count"></span></div><div id="packets" class="table-wrap"></div><h2>逐行复核记录</h2><div id="decisions" class="table-wrap"></div></section>

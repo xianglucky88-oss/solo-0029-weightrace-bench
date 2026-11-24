@@ -12,7 +12,12 @@ STEPS = (
 )
 
 STEP_KEYS = frozenset(key for key, _, _ in STEPS)
-LIMIT_KEYS = ("indication", "hysteresis", "repeatability", "eccentricity", "drift")
+BASE_LIMIT_KEYS = ("indication", "hysteresis", "repeatability", "eccentricity", "drift")
+INCREMENT_LIMIT_KEY = "increment"
+LIMIT_KEYS = BASE_LIMIT_KEYS + (INCREMENT_LIMIT_KEY,)
+# Steps collected once on the original loading round and reused by later rounds.
+CARRIED_STEPS = frozenset(("zero_in", "rise_low"))
+MAX_ROUNDS = 16
 
 
 def steps_for(loads):

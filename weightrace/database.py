@@ -2,7 +2,8 @@ from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 
-from .schema import SCHEMA, VERSION
+from .codec import canonical, loads
+from .schema import MIGRATE_1_TO_2, SCHEMA, VERSION
 
 
 class Database:
@@ -12,10 +13,25 @@ class Database:
         connection = self.connect()
         try:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, VERSION):
+            if version not in (0, 1, VERSION):
                 raise ValueError(f"无法打开数据库结构版本 {version}")
-            if version == 0:
-                connection.executescript(f"BEGIN IMMEDIATE;\n{SCHEMA}\nPRAGMA user_version = {VERSION};\nCOMMIT;")
+            if version in (0, 1):
+                connection.execute("BEGIN IMMEDIATE")
+                if version == 0:
+                    for statement in SCHEMA.split(";"):
+                        if statement.strip():
+                            connection.execute(statement)
+                else:
+                    for statement in MIGRATE_1_TO_2.split(";"):
+                        if statement.strip():
+                            connection.execute(statement)
+                    for sid, document in connection.execute("SELECT id, plan FROM sessions"):
+                        plan = loads(document)
+                        connection.execute(
+                            "INSERT INTO rounds(session, round, high_load, origin, switched_at) VALUES (?, 0, ?, 'plan', ?)",
+                            (sid, canonical(plan["loads"]["high"]), plan["measured_on"] + "T00:00:00Z"))
+                connection.execute(f"PRAGMA user_version = {VERSION}")
+                connection.execute("COMMIT")
             connection.execute("PRAGMA journal_mode = WAL")
         finally:
             connection.close()

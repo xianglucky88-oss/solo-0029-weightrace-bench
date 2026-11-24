@@ -10,10 +10,11 @@ export function renderSteps(result, onEvidence) {
     el('ul', {}, result.issues.map(({ code, step }) => el('li', {}, `${labels[step]}：${stateLabels[code]}`))))] : []));
   const rows = result.steps.map((step) => {
     const selected = step.candidates.find(({ id }) => id === step.selected);
-    return [step.label, badge(step.state), mono(selected?.observed_at.slice(11, 19) ?? '—'), mono(step.reference_mg),
+    return [step.label, badge(step.state), mono(`第 ${step.round ?? 0} 轮`),
+      mono(selected?.observed_at.slice(11, 19) ?? '—'), mono(step.reference_mg),
       mono(selected?.indicated_mg ?? '—'), mono(mg(step.error)),
       button(`证据 (${step.candidates.length})`, () => onEvidence(step), 'quiet', { disabled: !step.candidates.length })];
   });
-  $('steps').replaceChildren(table(['加载步骤', '状态', '采集 UTC', '参考 mg', '示值 mg', '误差 mg', '原始行'], rows));
+  $('steps').replaceChildren(table(['加载步骤', '状态', '加载轮', '采集 UTC', '参考 mg', '示值 mg', '误差 mg', '原始行'], rows));
   showCurve(result);
 }
