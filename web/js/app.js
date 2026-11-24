@@ -49,7 +49,7 @@ async function refresh(key, tab) {
   $('workspace').hidden = !current;
   $('empty').hidden = Boolean(current);
   if (!current) return;
-  const { plan, generation, state, result, releases } = current;
+  const { plan, generation, state, result, releases, sources } = current;
   const saved = async (message) => {
     try { await refresh(id); notice(message); }
     catch { notice(`${message} 刷新失败，请重新选择测次。`, true); }
@@ -59,7 +59,7 @@ async function refresh(key, tab) {
   $('work-facts').replaceChildren(`${plan.measured_on} · 分度 ${plan.resolution_mg} mg · 代次 ${generation} `, badge(state));
   $('publish').disabled = result.outcome === 'blocked' || releases[0]?.generation === generation;
   $('import-packet').onclick = () => showIntake(id, saved);
-  renderSteps(result, (step) => showEvidence(id, generation, step, saved));
+  renderSteps(result, (step) => showEvidence(id, generation, step, sources, saved));
   renderMetrics(result);
   renderRecords(current);
   renderReleases(id, releases, saved, run);

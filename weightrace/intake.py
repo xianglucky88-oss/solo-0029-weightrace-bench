@@ -43,8 +43,9 @@ def accept_packet(db, key, item):
         return {"id": packet["id"], "digest": checksum, "inserted": 0, "duplicate": True, "generation": generation}
     if db.execute("SELECT COUNT(*) FROM packets WHERE session=?", (key,)).fetchone()[0] >= MAX_PACKETS:
         raise Problem("packet_capacity", "该测次已达到采集包上限", 409)
-    db.execute("INSERT INTO packets VALUES (?, ?, ?, ?, ?)", (key, packet["id"], canonical(packet), checksum, now()))
-    inserted = 0
+    # Check every row against the working record before writing anything, so a
+    # rejected packet leaves no partial packet, reading, or source behind.
+    fresh = []
     for row in packet["rows"]:
         values = (row["step"], row["observed_at"], row["indicated_mg"])
         old = db.execute("SELECT step, observed_at, indicated_mg FROM readings WHERE session=? AND id=?",
@@ -53,12 +54,17 @@ def accept_packet(db, key, item):
             if tuple(old) != values:
                 raise Problem("row_conflict", "已归集的读数编号不能改写", 409, reading=row["id"])
         else:
-            db.execute("INSERT INTO readings VALUES (?, ?, ?, ?, ?, ?)", (key, row["id"], *values, packet["id"]))
-            inserted += 1
-    if db.execute("SELECT COUNT(*) FROM readings WHERE session=?", (key,)).fetchone()[0] > MAX_READINGS:
+            fresh.append((row["id"], values))
+    if db.execute("SELECT COUNT(*) FROM readings WHERE session=?", (key,)).fetchone()[0] + len(fresh) > MAX_READINGS:
         raise Problem("reading_capacity", "该测次超过读数上限，整包未归集", 409)
+    # Packet, readings, and sources take effect inside the caller's transaction.
+    db.execute("INSERT INTO packets VALUES (?, ?, ?, ?, ?)", (key, packet["id"], canonical(packet), checksum, now()))
+    for reading, values in fresh:
+        db.execute("INSERT INTO readings VALUES (?, ?, ?, ?, ?, ?)", (key, reading, *values, packet["id"]))
+    db.executemany("INSERT INTO reading_sources VALUES (?, ?, ?)",
+                   [(key, row["id"], packet["id"]) for row in packet["rows"]])
     # Even a second origin containing only duplicate readings is new evidence, not a retry.
-    return {"id": packet["id"], "digest": checksum, "inserted": inserted, "duplicate": False,
+    return {"id": packet["id"], "digest": checksum, "inserted": len(fresh), "duplicate": False,
             "generation": advance(db, key)}
 
 
@@ -66,3 +72,14 @@ def list_packets(db, key, include_payload=False):
     rows = db.execute("SELECT id, digest, accepted_at, payload FROM packets WHERE session=? ORDER BY id", (key,))
     return [({**item, "payload": loads(row["payload"])} if include_payload else item)
             for row in rows for item in ({name: row[name] for name in ("id", "digest", "accepted_at")},)]
+
+
+def list_sources(db, key):
+    """Map every reading of the session to all packets that carried it, oldest first."""
+    rows = db.execute("""SELECT s.reading, s.packet FROM reading_sources s
+        JOIN packets p ON p.session=s.session AND p.id=s.packet
+        WHERE s.session=? ORDER BY s.reading, p.accepted_at, s.packet""", (key,))
+    sources = {}
+    for row in rows:
+        sources.setdefault(row["reading"], []).append(row["packet"])
+    return sources

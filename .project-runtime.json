@@ -14,6 +14,8 @@
     {"workflow_id":"compare","command":"python3 -B -m tools.smoke --through compare"},
     {"workflow_id":"replay","command":"python3 -B -m tools.smoke --through replay"},
     {"workflow_id":"export","command":"python3 -B -m tools.smoke --through export"},
-    {"workflow_id":"withdraw","command":"python3 -B -m tools.smoke --through withdraw"}
+    {"workflow_id":"withdraw","command":"python3 -B -m tools.smoke --through withdraw"},
+    {"workflow_id":"sources","command":"python3 -B -m tools.smoke --through sources"},
+    {"workflow_id":"migrate","command":"python3 -B -m tools.smoke --through migrate"}
   ]
 }

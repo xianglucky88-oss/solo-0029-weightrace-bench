@@ -30,11 +30,13 @@ export function showIntake(id, onSaved) {
     }));
 }
 
-export function showEvidence(id, generation, step, onSaved) {
+export function showEvidence(id, generation, step, sources, onSaved) {
   const rows = step.candidates.map((row) => {
     const active = row.decision?.action !== 'exclude';
     const action = active ? 'exclude' : 'include';
-    return [mono(row.id), mono(row.origin_packet), mono(row.observed_at), mono(row.indicated_mg),
+    const origins = sources?.[row.id] ?? [row.origin_packet];
+    return [mono(row.id), el('span', {}, origins.flatMap((packet, index) => (index ? ['、', mono(packet)] : [mono(packet)]))),
+      mono(row.observed_at), mono(row.indicated_mg),
       active ? '有效' : '已剔除', button(actionLabels[action], () => {
         openEditor(`${actionLabels[action]} ${row.id}`, editorForm(labelled('复核说明', el('textarea', {
           name: 'reason', required: true, maxlength: 180, rows: 3,
@@ -45,5 +47,5 @@ export function showEvidence(id, generation, step, onSaved) {
         }));
       })];
   });
-  openEditor(step.label, el('div', { class: 'table-wrap' }, table(['读数', '首次采集包', 'UTC', '示值 mg', '状态', '复核'], rows)));
+  openEditor(step.label, el('div', { class: 'table-wrap' }, table(['读数', '来源采集包', 'UTC', '示值 mg', '状态', '复核'], rows)));
 }

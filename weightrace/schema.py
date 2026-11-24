@@ -1,4 +1,20 @@
-VERSION = 1
+VERSION = 2
+
+# A reading may legitimately arrive in several packets; every receiving packet is
+# a real origin. The map is scoped by session so another session reusing the same
+# reading number never leaks in, and the primary key absorbs packet resends.
+SOURCES_TABLE = """
+CREATE TABLE IF NOT EXISTS reading_sources (
+    session TEXT NOT NULL,
+    reading TEXT NOT NULL,
+    packet TEXT NOT NULL,
+    PRIMARY KEY (session, reading, packet),
+    FOREIGN KEY (session, reading) REFERENCES readings(session, id),
+    FOREIGN KEY (session, packet) REFERENCES packets(session, id)
+)
+"""
+
+SOURCES_INDEX = "CREATE INDEX IF NOT EXISTS reading_sources_packet ON reading_sources(session, packet)"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS standards (
@@ -27,6 +43,8 @@ CREATE TABLE IF NOT EXISTS decisions (
     FOREIGN KEY (session, reading) REFERENCES readings(session, id)
 );
 CREATE INDEX IF NOT EXISTS decisions_reading ON decisions(session, reading, generation);
+""" + SOURCES_TABLE + ";\n" + SOURCES_INDEX + """;
+
 CREATE TABLE IF NOT EXISTS releases (
     session TEXT NOT NULL REFERENCES sessions ON DELETE RESTRICT,
     number INTEGER NOT NULL, generation INTEGER NOT NULL, published_at TEXT NOT NULL,

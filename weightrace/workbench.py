@@ -1,6 +1,6 @@
 from .archives import list_releases
 from .evaluation import evaluate, working_input
-from .intake import list_packets
+from .intake import list_packets, list_sources
 
 
 def read_workbench(db, key):
@@ -11,4 +11,4 @@ def read_workbench(db, key):
         state = "withdrawn"
     return {"plan": snapshot["plan"], "generation": snapshot["generation"], "state": state,
             "result": evaluate(snapshot), "decisions": snapshot["decisions"],
-            "packets": list_packets(db, key), "releases": releases}
+            "packets": list_packets(db, key), "sources": list_sources(db, key), "releases": releases}

@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 
+from .migrate import migrate_v1
 from .schema import SCHEMA, VERSION
 
 
@@ -12,10 +13,13 @@ class Database:
         connection = self.connect()
         try:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, VERSION):
-                raise ValueError(f"无法打开数据库结构版本 {version}")
             if version == 0:
                 connection.executescript(f"BEGIN IMMEDIATE;\n{SCHEMA}\nPRAGMA user_version = {VERSION};\nCOMMIT;")
+            elif version == 1:
+                # Atomic: on failure the file stays at version 1 and reusable.
+                migrate_v1(connection)
+            elif version != VERSION:
+                raise ValueError(f"无法打开数据库结构版本 {version}")
             connection.execute("PRAGMA journal_mode = WAL")
         finally:
             connection.close()
